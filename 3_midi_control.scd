@@ -1,5 +1,5 @@
 // SuperCollider Ethereum Sonification - MIDI Control System
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-03 01:48:24
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 01:06:00
 // Current User's Login: alejoduque
 
 {
@@ -72,8 +72,20 @@
                 var mappedVal = spec.map(val/127);
                 ~controlBuses[name].set(mappedVal);
                 ~controlValues[name] = mappedVal;
+                
+                // Update GUI if it exists (deferred to avoid timing issues)
+                {
+                    if(~gui.notNil) {
+                        if(~gui.sliders[name].notNil) {
+                            ~gui.sliders[name].value = val/127;
+                        };
+                    };
+                }.defer;
+                
                 ~midiCounter = ~midiCounter + 1;
-                "MIDI CC: % -> % (mapped: %)".format(name, val, mappedVal).postln;
+                if(~midiCounter % 10 == 0) {  // Only print every 10th value
+                    "MIDI CC: % -> % (mapped: %)".format(name, val, mappedVal.round(0.001)).postln;
+                }
             }, cc, ~midiChannel);
         };
 

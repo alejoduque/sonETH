@@ -1,27 +1,39 @@
 // SuperCollider Ethereum Sonification - GUI System
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-03 01:48:24
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-03 19:33:44
 // Current User's Login: alejoduque
+// Author: Alejandro Duque Jaramillo
 
+(
 {
     var success = true;
+    var statusView, counterView, controlView;  // Declare all vars at the start
+    var container;
 
     try {
-        // Create and store window
-        ~mainWindow = Window("Ethereum Sonification Control", Rect(100, 100, 600, 400));
-        ~mainWindow.view.decorator = FlowLayout(~mainWindow.bounds);
+        // Create and store window with explicit bounds
+        ~mainWindow = Window("Ethereum Sonification Control", Rect(100, 100, 600, 400))
+            .layout_(VLayout());
+
+        // Create main container views
+        statusView = View().layout_(HLayout().margins_(20));
+        counterView = View().layout_(HLayout().margins_(20));
+        controlView = View().layout_(HLayout().margins_(20));
 
         // Status indicator function
         ~makeStatusLight = { |label|
-            var composite = CompositeView(~mainWindow, 150@20);
-            var indicator;
-            StaticText(composite, 80@20).string = label;
-            indicator = UserView(composite, 20@20)
+            var container = View().layout_(HLayout());
+            var indicator = UserView(container)
+                .maxHeight_(20)
+                .maxWidth_(20)
                 .drawFunc_({ |uview|
                     var state = uview.getProperty(\status) ? 0;
                     Pen.fillColor = if(state == 1) { Color.green } { Color.red };
                     Pen.addOval(Rect(0, 0, 20, 20));
                     Pen.fill;
                 });
+            
+            container.layout.add(StaticText().string_(label).minWidth_(80));
+            container.layout.add(indicator);
             indicator.setProperty(\status, 0);
             indicator;
         };
@@ -34,16 +46,21 @@
             midi: ~makeStatusLight.value("MIDI:")
         );
 
-        ~mainWindow.view.decorator.nextLine;
+        // Add status lights to status view
+        ~statusLights.keysValuesDo({ |key, light|
+            statusView.layout.add(light.parent);
+        });
 
         // Counter function
         ~makeCounter = { |label|
-            var composite = CompositeView(~mainWindow, 150@20);
-            var counter;
-            StaticText(composite, 80@20).string = label;
-            counter = NumberBox(composite, 50@20)
+            var container = View().layout_(HLayout());
+            var counter = NumberBox()
                 .enabled_(false)
-                .string_("0");
+                .string_("0")
+                .minWidth_(50);
+            
+            container.layout.add(StaticText().string_(label).minWidth_(80));
+            container.layout.add(counter);
             counter;
         };
 
@@ -55,7 +72,10 @@
             midi: ~makeCounter.value("MIDI:")
         );
 
-        ~mainWindow.view.decorator.nextLine;
+        // Add counters to counter view
+        ~counters.keysValuesDo({ |key, counter|
+            counterView.layout.add(counter.parent);
+        });
 
         // Store specs for MIDI-to-knob conversion
         ~controlSpecs = (
@@ -67,18 +87,23 @@
 
         // Control knob function with value display
         ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
-            var composite, knob, valueLabel, spec, displayStr;
+            var container = View().layout_(VLayout());
+            var knobContainer = View().layout_(HLayout());
+            var spec = ControlSpec(minVal, maxVal, mapping);
+            var knob = Knob()
+                .maxHeight_(80)
+                .maxWidth_(80);
+            var displayStr = label.asString;
+            var valueLabel;
             
-            composite = CompositeView(~mainWindow, 150@100);
-            spec = ControlSpec(minVal, maxVal, mapping);
-            knob = Knob(composite, 80@80);
-            
-            // Format display label
-            displayStr = label.asString;
             displayStr = displayStr[0].toUpper ++ displayStr[1..];
+            valueLabel = StaticText()
+                .string_(displayStr ++ ": " ++ defaultVal.round(0.001))
+                .align_(\center);
             
-            valueLabel = StaticText(composite, 150@20)
-                .string_(displayStr ++ ": " ++ defaultVal.round(0.001));
+            knobContainer.layout.add(knob);
+            container.layout.add(knobContainer);
+            container.layout.add(valueLabel);
             
             knob.action = { |k|
                 var mappedVal = spec.map(k.value);
@@ -99,7 +124,7 @@
             ~controlSpecs[label.toLower.asSymbol] = spec;
             
             knob.value = spec.unmap(defaultVal);
-            knob;
+            container;
         };
 
         // Create control knobs
@@ -109,6 +134,16 @@
             grainsize: ~makeKnob.value("GrainSize", 0.01, 0.5, ~controlValues.grainsize ? 0.1, \exp),
             filterfreq: ~makeKnob.value("FilterFreq", 200, 5000, ~controlValues.filterfreq ? 1000, \exp)
         );
+
+        // Add knobs to control view
+        ~knobs.keysValuesDo({ |key, knob|
+            controlView.layout.add(knob);
+        });
+
+        // Add all views to main window
+        ~mainWindow.layout.add(statusView);
+        ~mainWindow.layout.add(counterView);
+        ~mainWindow.layout.add(controlView);
 
         // Stop existing routine if it exists
         if(~guiRoutine.notNil) { ~guiRoutine.stop };
@@ -177,3 +212,4 @@
         false;
     }
 }.value;
+)
