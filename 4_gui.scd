@@ -1,12 +1,11 @@
 // SuperCollider Ethereum Sonification - GUI System
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-03 19:33:44
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 02:51:03
 // Current User's Login: alejoduque
-// Author: Alejandro Duque Jaramillo
 
 (
 {
     var success = true;
-    var statusView, counterView, controlView;  // Declare all vars at the start
+    var statusView, counterView, controlView;
     var container;
 
     try {
@@ -46,7 +45,7 @@
             midi: ~makeStatusLight.value("MIDI:")
         );
 
-        // Add status lights to status view
+        // Add status lights
         ~statusLights.keysValuesDo({ |key, light|
             statusView.layout.add(light.parent);
         });
@@ -72,27 +71,35 @@
             midi: ~makeCounter.value("MIDI:")
         );
 
-        // Add counters to counter view
+        // Add counters
         ~counters.keysValuesDo({ |key, counter|
             counterView.layout.add(counter.parent);
         });
 
-        // Store specs for MIDI-to-knob conversion
+        // Store specs for control mapping
         ~controlSpecs = (
             volume: ControlSpec(0, 1, \lin),
             fmratio: ControlSpec(0.5, 4, \exp),
             grainsize: ControlSpec(0.01, 0.5, \exp),
-            filterfreq: ControlSpec(200, 5000, \exp)
+            filterfreq: ControlSpec(200, 5000, \exp),
+            pitchoffset: ControlSpec(-12, 12, \lin),
+            fmdepth: ControlSpec(0, 1, \lin),
+            graindensity: ControlSpec(5, 50, \exp),
+            decay: ControlSpec(0.5, 3, \lin),
+            delaymix: ControlSpec(0, 1, \lin),
+            reverbmix: ControlSpec(0, 1, \lin)
         );
 
-        // Control knob function with value display
+        // Improved knob function with value display
         ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
             var container = View().layout_(VLayout());
             var knobContainer = View().layout_(HLayout());
             var spec = ControlSpec(minVal, maxVal, mapping);
             var knob = Knob()
                 .maxHeight_(80)
-                .maxWidth_(80);
+                .maxWidth_(80)
+                .mode_(\vert)
+                .value_(spec.unmap(defaultVal));
             var displayStr = label.asString;
             var valueLabel;
             
@@ -105,12 +112,25 @@
             container.layout.add(knobContainer);
             container.layout.add(valueLabel);
             
+            // Improved knob action with synchronous bus updates
             knob.action = { |k|
                 var mappedVal = spec.map(k.value);
                 try {
-                    ~controlBuses[label.toLower.asSymbol].set(mappedVal);
+                    ~controlBuses[label.toLower.asSymbol].setSynchronous(mappedVal);
                     ~controlValues[label.toLower.asSymbol] = mappedVal;
                     valueLabel.string = displayStr ++ ": " ++ mappedVal.round(0.001);
+                    
+                    // Update active synths immediately
+                    if(~currentSynths.notNil) {
+                        ~currentSynths.do { |synth|
+                            if(synth.notNil && synth.isPlaying) {
+                                synth.set(
+                                    (label.toLower ++ "Bus").asSymbol,
+                                    ~controlBuses[label.toLower.asSymbol].index
+                                );
+                            };
+                        };
+                    };
                 };
             };
             
@@ -121,13 +141,11 @@
             ~displayLabels[label.toLower.asSymbol] = displayStr;
             ~knobViews = ~knobViews ? ();
             ~knobViews[label.toLower.asSymbol] = knob;
-            ~controlSpecs[label.toLower.asSymbol] = spec;
             
-            knob.value = spec.unmap(defaultVal);
             container;
         };
 
-        // Create control knobs
+        // Create control knobs with proper ranges
         ~knobs = (
             volume: ~makeKnob.value("Volume", 0, 1, ~controlValues.volume ? 0.3),
             fmratio: ~makeKnob.value("FmRatio", 0.5, 4, ~controlValues.fmratio ? 1.0, \exp),
@@ -148,7 +166,7 @@
         // Stop existing routine if it exists
         if(~guiRoutine.notNil) { ~guiRoutine.stop };
 
-        // Create update routine
+        // Create update routine with improved refresh rate
         ~guiRoutine = Routine({
             loop {
                 {
@@ -164,18 +182,19 @@
                     ~counters.trans.string = (~transactionCounter ? 0).asString;
                     ~counters.midi.string = (~midiCounter ? 0).asString;
 
-                    // Update control values from MIDI
-                    if(~controlValues.notNil) {
-                        ~controlLabels.keysValuesDo { |key, label|
-                            if(~controlValues[key].notNil) {
-                                var val = ~controlValues[key];
+                    // Update knobs from control buses
+                    if(~controlBuses.notNil and: { ~knobViews.notNil }) {
+                        ~controlBuses.keysValuesDo { |key, bus|
+                            if(~knobViews[key].notNil) {
+                                var val = bus.getSynchronous;
                                 var spec = ~controlSpecs[key];
                                 if(spec.notNil) {
-                                    // Update knob position
                                     ~knobViews[key].value = spec.unmap(val);
+                                    if(~controlLabels[key].notNil) {
+                                        ~controlLabels[key].string = 
+                                            ~displayLabels[key] ++ ": " ++ val.round(0.001);
+                                    };
                                 };
-                                // Update label
-                                label.string = ~displayLabels[key] ++ ": " ++ val.round(0.001);
                             };
                         };
                     };
@@ -183,7 +202,7 @@
                     // Refresh all status lights
                     ~statusLights.do(_.refresh);
                 }.defer;
-                0.1.wait;
+                0.02.wait;  // 50Hz refresh rate
             }
         }).play(AppClock);
 

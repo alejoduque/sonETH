@@ -1,7 +1,8 @@
 // SuperCollider Ethereum Sonification - MIDI Control System
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 01:06:00
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 02:56:21
 // Current User's Login: alejoduque
 
+(
 {
     var success = true;
     
@@ -20,8 +21,8 @@
         ~midiControl = ();  // Required by loader
 
         // Initialize control buses if they don't exist
-        ~controlBuses = ~controlBuses ?? {
-            (
+        if(~controlBuses.isNil) {
+            ~controlBuses = (
                 volume: Bus.control(s, 1).set(0.3),
                 fmratio: Bus.control(s, 1).set(1.0),
                 grainsize: Bus.control(s, 1).set(0.1),
@@ -32,12 +33,12 @@
                 decay: Bus.control(s, 1).set(1.5),
                 delaymix: Bus.control(s, 1).set(0.2),
                 reverbmix: Bus.control(s, 1).set(0.3)
-            )
+            );
         };
 
-        // Initialize control values for GUI sync
-        ~controlValues = ~controlValues ?? {
-            (
+        // Initialize control values if they don't exist
+        if(~controlValues.isNil) {
+            ~controlValues = (
                 volume: 0.3,
                 fmratio: 1.0,
                 grainsize: 0.1,
@@ -48,7 +49,12 @@
                 decay: 1.5,
                 delaymix: 0.2,
                 reverbmix: 0.3
-            )
+            );
+        };
+
+        // Initialize synth tracking list if it doesn't exist
+        if(~currentSynths.isNil) {
+            ~currentSynths = List.new;
         };
 
         // Define MIDI mappings
@@ -70,14 +76,28 @@
             MIDIdef.cc(name, { |val|
                 var spec = ControlSpec(min, max, curve);
                 var mappedVal = spec.map(val/127);
-                ~controlBuses[name].set(mappedVal);
+                
+                // Immediate bus update
+                ~controlBuses[name].setSynchronous(mappedVal);
                 ~controlValues[name] = mappedVal;
                 
-                // Update GUI if it exists (deferred to avoid timing issues)
+                // Update any active synths
+                ~currentSynths.do { |synth|
+                    if(synth.notNil and: { synth.isPlaying }) {
+                        synth.set(
+                            (name ++ "Bus").asSymbol,
+                            ~controlBuses[name].index
+                        );
+                    };
+                };
+                
+                // Update GUI immediately
                 {
-                    if(~gui.notNil) {
-                        if(~gui.sliders[name].notNil) {
-                            ~gui.sliders[name].value = val/127;
+                    if(~knobViews.notNil and: { ~knobViews[name].notNil }) {
+                        ~knobViews[name].value = val/127;
+                        if(~controlLabels[name].notNil) {
+                            ~controlLabels[name].string = 
+                                ~displayLabels[name] ++ ": " ++ mappedVal.round(0.001);
                         };
                     };
                 }.defer;
@@ -89,11 +109,27 @@
             }, cc, ~midiChannel);
         };
 
+        // Clean up any existing cleanup routine
+        if(~cleanupRoutine.notNil) { ~cleanupRoutine.stop };
+        
+        // Start new cleanup routine
+        ~cleanupRoutine = Routine {
+            loop {
+                ~currentSynths.copy.do { |synth, i|
+                    if(synth.isNil or: { synth.isPlaying.not }) {
+                        ~currentSynths.removeAt(i);
+                    };
+                };
+                2.wait;
+            };
+        }.play;
+
         "MIDI Control System loaded.".postln;
-        true;
+        success;
     } {
         |error|
         "MIDI initialization error: %".format(error.errorString).error;
         false;
     }
 }.value;
+)

@@ -1,7 +1,4 @@
 // SuperCollider Ethereum Sonification - Synth Definitions
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-03 23:57:35
-// Current User's Login: alejoduque
-
 (
 // Monitor synth for main output
 SynthDef(\mainMonitor, {
@@ -17,29 +14,31 @@ SynthDef(\mainMonitor, {
 SynthDef(\elektronBell, {
     arg freq=440, amp=0.3, 
     atk=0.01, dec=0.3, rel=0.5,
-    fmRatio=1.0, fmDepth=0.2,
-    grainSize=0.1, grainDensity=10,
-    filterFreq=1000, res=0.4,
-    decay=1.5, delayMix=0.2, reverbMix=0.3,
-    pitchOffset=0, pan=0,
+    fmRatioBus=0, fmDepthBus=0,
+    grainSizeBus=0, grainDensityBus=0,
+    filterFreqBus=0, res=0.4,
+    decayBus=0, delayMixBus=0, reverbMixBus=0,
+    pitchOffsetBus=0, pan=0,
     out=0,
-    volumeBus=0;  // Add volume bus input
+    volumeBus=0;
 
     var env, sig, mod, carrier, grains, wet;
-    var volume = In.kr(volumeBus, 1);  // Read from volume bus
+    var volume = In.kr(volumeBus, 1);
+    var fmRatio = In.kr(fmRatioBus, 1);
+    var fmDepth = In.kr(fmDepthBus, 1);
+    var grainSize = In.kr(grainSizeBus, 1);
+    var grainDensity = In.kr(grainDensityBus, 1);
+    var filterFreq = In.kr(filterFreqBus, 1);
     
-    // Apply pitch offset
-    freq = freq * pitchOffset.midiratio;
-    
-    // FM Synthesis
-    mod = SinOsc.ar(freq * fmRatio) * fmDepth * freq;
+    // Enhanced FM Synthesis
+    mod = SinOsc.ar(freq * fmRatio, 0, fmDepth * 1000);  // Increased modulation depth
     carrier = SinOsc.ar(freq + mod);
     
     // Envelope
     env = EnvGen.kr(
         Env.new(
             [0, 1, 0.5, 0],
-            [atk, dec * decay, rel * decay],
+            [atk, dec, rel],
             [-4, -2, -4]
         ),
         doneAction: 2
@@ -47,49 +46,32 @@ SynthDef(\elektronBell, {
     
     sig = carrier * env;
     
-    // Filter
+    // Filter with wider range
     sig = RLPF.ar(
         sig,
-        filterFreq,
+        filterFreq.linexp(0, 1, 200, 8000),
         res
     );
     
-    // Granular processing
+    // Granular processing with more presence
     grains = GrainIn.ar(
         2,
-        Dust.kr(grainDensity),
-        grainSize,
+        Dust.kr(grainDensity * 20),  // Increased density range
+        grainSize.linlin(0, 1, 0.01, 0.2),
         sig,
         pan
     );
     
-    sig = XFade2.ar(sig, grains, 0.5);
-    
-    // Delay
-    wet = DelayC.ar(
-        sig,
-        0.5,
-        LFNoise2.kr(0.1).range(0.2, 0.4),
-        delayMix
-    );
-    sig = sig + wet;
-    
-    // Reverb
-    sig = FreeVerb2.ar(
-        sig[0], sig[1],
-        reverbMix,
-        0.7,
-        0.5
-    );
+    sig = XFade2.ar(sig, grains, 0);  // Less grain mix for clearer sound
     
     // Final output with volume control
     sig = sig * amp * volume;
-    sig = Balance2.ar(sig[0], sig[1], pan);
+    sig = Balance2.ar(sig, sig, pan);
     
     Out.ar(out, sig);
 }).add;
 
-// Beat synth definition with volume control
+// Beat synth definition
 SynthDef(\beatSynth, {
     arg out=0, freq=440, amp=0.5, rel=0.1, volumeBus=0;
     var env, sig;
@@ -101,20 +83,11 @@ SynthDef(\beatSynth, {
     Out.ar(out, sig!2);
 }).add;
 
-// Test synth with volume control
-SynthDef(\testBeep, {
-    arg out=0, freq=440, amp=0.2, volumeBus=0;
-    var env = EnvGen.kr(Env.perc(0.01, 0.1), doneAction: 2);
-    var volume = In.kr(volumeBus, 1);
-    var sig = SinOsc.ar(freq) * env * amp * volume;
-    Out.ar(out, sig!2);
-}).add;
-
 s.sync;
 
 // Create the main monitor instance
-~mainMonitor.free; // Free any existing monitor
-~mainMonitor = Synth.tail(~rootGroup, \mainMonitor, [
+~mainMonitor.free;
+~mainMonitor = Synth.tail(s, \mainMonitor, [
     \inMain, ~audioBuses.main,
     \inTrans, ~audioBuses.transactions,
     \inEffects, ~audioBuses.effects,
@@ -122,27 +95,5 @@ s.sync;
     \amp, 1
 ]);
 
-// Test the routing
-{
-    // Test through main bus
-    Synth(\testBeep, [
-        \out, ~audioBuses.main,
-        \freq, 440,
-        \amp, 0.3,
-        \volumeBus, ~controlBuses.volume
-    ]);
-    
-    1.wait;
-    
-    // Test through transaction bus
-    Synth(\testBeep, [
-        \out, ~audioBuses.transactions,
-        \freq, 880,
-        \amp, 0.3,
-        \volumeBus, ~controlBuses.volume
-    ]);
-    
-}.fork;
-
-"Synth definitions and monitoring system loaded successfully.".postln;
+"Synth definitions loaded successfully.".postln;
 )
