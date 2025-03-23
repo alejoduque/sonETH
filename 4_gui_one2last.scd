@@ -1,5 +1,5 @@
 // SuperCollider Ethereum Sonification - GUI System
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 02:51:03
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-07 00:43:08
 // Current User's Login: alejoduque
 
 (
@@ -9,16 +9,16 @@
     var container;
 
     try {
-        // Create and store window with explicit bounds
+        // Create window with original layout
         ~mainWindow = Window("Ethereum Sonification Control", Rect(100, 100, 600, 400))
             .layout_(VLayout());
 
-        // Create main container views
+        // Create container views with original margins
         statusView = View().layout_(HLayout().margins_(20));
         counterView = View().layout_(HLayout().margins_(20));
         controlView = View().layout_(HLayout().margins_(20));
 
-        // Status indicator function
+        // Status light function
         ~makeStatusLight = { |label|
             var container = View().layout_(HLayout());
             var indicator = UserView(container)
@@ -30,11 +30,26 @@
                     Pen.addOval(Rect(0, 0, 20, 20));
                     Pen.fill;
                 });
-
+            
             container.layout.add(StaticText().string_(label).minWidth_(80));
             container.layout.add(indicator);
             indicator.setProperty(\status, 0);
             indicator;
+        };
+
+        // Counter function
+        ~makeCounter = { |label|
+            var container = View().layout_(HLayout());
+            var counter = NumberBox()
+                .enabled_(false)
+                .string_("0")
+                .minWidth_(50)
+                .stringColor_(Color.black)
+                .background_(Color.white);
+            
+            container.layout.add(StaticText().string_(label).minWidth_(80).stringColor_(Color.black));
+            container.layout.add(counter);
+            counter;
         };
 
         // Create status indicators
@@ -49,19 +64,6 @@
         ~statusLights.keysValuesDo({ |key, light|
             statusView.layout.add(light.parent);
         });
-
-        // Counter function
-        ~makeCounter = { |label|
-            var container = View().layout_(HLayout());
-            var counter = NumberBox()
-                .enabled_(false)
-                .string_("0")
-                .minWidth_(50);
-
-            container.layout.add(StaticText().string_(label).minWidth_(80));
-            container.layout.add(counter);
-            counter;
-        };
 
         // Create counters
         ~counters = (
@@ -80,17 +82,11 @@
         ~controlSpecs = (
             volume: ControlSpec(0, 1, \lin),
             fmratio: ControlSpec(0.5, 4, \exp),
-            grainsize: ControlSpec(0.01, 0.5, \exp),
-            filterfreq: ControlSpec(200, 5000, \exp),
-            pitchoffset: ControlSpec(-12, 12, \lin),
             fmdepth: ControlSpec(0, 1, \lin),
-            graindensity: ControlSpec(5, 50, \exp),
-            decay: ControlSpec(0.5, 3, \lin),
-            delaymix: ControlSpec(0, 1, \lin),
-            reverbmix: ControlSpec(0, 1, \lin)
+            filterfreq: ControlSpec(200, 5000, \exp)
         );
 
-        // Improved knob function with value display
+        // Knob function with improved value display
         ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
             var container = View().layout_(VLayout());
             var knobContainer = View().layout_(HLayout());
@@ -99,19 +95,22 @@
                 .maxHeight_(80)
                 .maxWidth_(80)
                 .mode_(\vert)
+                .color_([Color.grey, Color.white, Color.green, Color.green])
+                .background_(Color.grey)
                 .value_(spec.unmap(defaultVal));
             var displayStr = label.asString;
             var valueLabel;
-
+            
             displayStr = displayStr[0].toUpper ++ displayStr[1..];
             valueLabel = StaticText()
                 .string_(displayStr ++ ": " ++ defaultVal.round(0.001))
+                .stringColor_(Color.black)
                 .align_(\center);
-
+            
             knobContainer.layout.add(knob);
             container.layout.add(knobContainer);
             container.layout.add(valueLabel);
-
+            
             // Improved knob action with synchronous bus updates
             knob.action = { |k|
                 var mappedVal = spec.map(k.value);
@@ -119,7 +118,7 @@
                     ~controlBuses[label.toLower.asSymbol].setSynchronous(mappedVal);
                     ~controlValues[label.toLower.asSymbol] = mappedVal;
                     valueLabel.string = displayStr ++ ": " ++ mappedVal.round(0.001);
-
+                    
                     // Update active synths immediately
                     if(~currentSynths.notNil) {
                         ~currentSynths.do { |synth|
@@ -133,7 +132,7 @@
                     };
                 };
             };
-
+            
             // Store for updates
             ~controlLabels = ~controlLabels ? ();
             ~controlLabels[label.toLower.asSymbol] = valueLabel;
@@ -141,16 +140,16 @@
             ~displayLabels[label.toLower.asSymbol] = displayStr;
             ~knobViews = ~knobViews ? ();
             ~knobViews[label.toLower.asSymbol] = knob;
-
+            
             container;
         };
 
-        // Create control knobs with proper ranges
+        // Create knobs
         ~knobs = (
-            volume: ~makeKnob.value("Volume", 0, 1, ~controlValues.volume ? 0.3),
-            fmratio: ~makeKnob.value("FmRatio", 0.5, 4, ~controlValues.fmratio ? 1.0, \exp),
-            grainsize: ~makeKnob.value("GrainSize", 0.01, 0.5, ~controlValues.grainsize ? 0.1, \exp),
-            filterfreq: ~makeKnob.value("FilterFreq", 200, 5000, ~controlValues.filterfreq ? 1000, \exp)
+            volume: ~makeKnob.value("Volume (CC 0)", 0, 1, ~controlValues.volume ? 0.3),
+            fmratio: ~makeKnob.value("FM Ratio (CC 1)", 0.5, 4, ~controlValues.fmratio ? 1.0, \exp),
+            fmdepth: ~makeKnob.value("FM Depth (CC 32)", 0, 1, ~controlValues.fmdepth ? 0.2),
+            filterfreq: ~makeKnob.value("Filter (CC 3)", 200, 5000, ~controlValues.filterfreq ? 1000, \exp)
         );
 
         // Add knobs to control view
@@ -163,16 +162,15 @@
         ~mainWindow.layout.add(counterView);
         ~mainWindow.layout.add(controlView);
 
-        // Stop existing routine if it exists
+        // GUI update routine
         if(~guiRoutine.notNil) { ~guiRoutine.stop };
 
-        // Create update routine with improved refresh rate
         ~guiRoutine = Routine({
             loop {
                 {
                     // Update status indicators
                     ~statusLights.server.setProperty(\status, Server.default.serverRunning.binaryValue);
-                    ~statusLights.beat.setProperty(\status, (~beatEngine.notNil and: { ~beatEngine.running }).binaryValue);
+                    ~statusLights.beat.setProperty(\status, (~beatEngine.notNil and: { ~beatParams.isRunning }).binaryValue);
                     ~statusLights.osc.setProperty(\status, ~handleTransaction.notNil.binaryValue);
                     ~statusLights.midi.setProperty(\status, MIDIClient.sources.notEmpty.binaryValue);
 
@@ -191,7 +189,7 @@
                                 if(spec.notNil) {
                                     ~knobViews[key].value = spec.unmap(val);
                                     if(~controlLabels[key].notNil) {
-                                        ~controlLabels[key].string =
+                                        ~controlLabels[key].string = 
                                             ~displayLabels[key] ++ ": " ++ val.round(0.001);
                                     };
                                 };
@@ -199,14 +197,14 @@
                         };
                     };
 
-                    // Refresh all status lights
+                    // Refresh status lights
                     ~statusLights.do(_.refresh);
                 }.defer;
                 0.02.wait;  // 50Hz refresh rate
             }
         }).play(AppClock);
 
-        // Set window cleanup
+        // Window cleanup
         ~mainWindow.onClose = {
             ~guiRoutine.stop;
             ~guiRoutine = nil;
@@ -221,7 +219,7 @@
         };
 
         ~mainWindow.front;
-        "GUI System loaded successfully.".postln;
+        "GUI System loaded - MIDI-to-knob sync enabled".postln;
         success;
     } {
         |error|

@@ -1,99 +1,203 @@
-// SuperCollider Ethereum Sonification - Synth Definitions
+// SuperCollider Ethereum Sonification - Synth Definitions (Modified)
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-12 10:45:00
+// Current User's Login: alejoduque
+
 (
-// Monitor synth for main output
-SynthDef(\mainMonitor, {
-    arg inMain=0, inTrans=0, inEffects=0, out=0, amp=1;
-    var main = In.ar(inMain, 2);
-    var trans = In.ar(inTrans, 2);
-    var effects = In.ar(inEffects, 2);
-    var mix = Mix([main, trans, effects]) * amp;
-    Out.ar(out, mix);
-}).add;
+// Clear existing definitions
+Server.default.quit;
+s.waitForBoot({
 
-// Main transaction synth
-SynthDef(\elektronBell, {
-    arg freq=440, amp=0.3, 
-    atk=0.01, dec=0.3, rel=0.5,
-    fmRatioBus=0, fmDepthBus=0,
-    grainSizeBus=0, grainDensityBus=0,
-    filterFreqBus=0, res=0.4,
-    decayBus=0, delayMixBus=0, reverbMixBus=0,
-    pitchOffsetBus=0, pan=0,
-    out=0,
-    volumeBus=0;
-
-    var env, sig, mod, carrier, grains, wet;
-    var volume = In.kr(volumeBus, 1);
-    var fmRatio = In.kr(fmRatioBus, 1);
-    var fmDepth = In.kr(fmDepthBus, 1);
-    var grainSize = In.kr(grainSizeBus, 1);
-    var grainDensity = In.kr(grainDensityBus, 1);
-    var filterFreq = In.kr(filterFreqBus, 1);
-    
-    // Enhanced FM Synthesis
-    mod = SinOsc.ar(freq * fmRatio, 0, fmDepth * 1000);  // Increased modulation depth
-    carrier = SinOsc.ar(freq + mod);
-    
-    // Envelope
-    env = EnvGen.kr(
-        Env.new(
-            [0, 1, 0.5, 0],
-            [atk, dec, rel],
-            [-4, -2, -4]
-        ),
-        doneAction: 2
+    // Initialize audio buses if not already defined
+    ~audioBuses = ~audioBuses ?? (
+        main: Bus.audio(s, 2)    // Main stereo output bus
     );
-    
-    sig = carrier * env;
-    
-    // Filter with wider range
-    sig = RLPF.ar(
-        sig,
-        filterFreq.linexp(0, 1, 200, 8000),
-        res
+
+    // Control buses for MIDI/GUI
+    ~controlBuses = ~controlBuses ?? (
+        volume: Bus.control(s, 1).set(0.3),
+        fmratio: Bus.control(s, 1).set(1.0),
+        grainsize: Bus.control(s, 1).set(0.1),
+        filterfreq: Bus.control(s, 1).set(1000),
+        pitchoffset: Bus.control(s, 1).set(0),
+        fmdepth: Bus.control(s, 1).set(0.2),
+        graindensity: Bus.control(s, 1).set(10),
+        decay: Bus.control(s, 1).set(1.5),
+        delaymix: Bus.control(s, 1).set(0.2),
+        reverbmix: Bus.control(s, 1).set(0.3)
     );
-    
-    // Granular processing with more presence
-    grains = GrainIn.ar(
-        2,
-        Dust.kr(grainDensity * 20),  // Increased density range
-        grainSize.linlin(0, 1, 0.01, 0.2),
-        sig,
-        pan
+
+    // Initialize control values
+    ~controlValues = ~controlValues ?? (
+        volume: 0.3,
+        fmratio: 1.0,
+        grainsize: 0.1,
+        filterfreq: 1000,
+        pitchoffset: 0,
+        fmdepth: 0.2,
+        graindensity: 10,
+        decay: 1.5,
+        delaymix: 0.2,
+        reverbmix: 0.3
     );
-    
-    sig = XFade2.ar(sig, grains, 0);  // Less grain mix for clearer sound
-    
-    // Final output with volume control
-    sig = sig * amp * volume;
-    sig = Balance2.ar(sig, sig, pan);
-    
-    Out.ar(out, sig);
-}).add;
 
-// Beat synth definition
-SynthDef(\beatSynth, {
-    arg out=0, freq=440, amp=0.5, rel=0.1, volumeBus=0;
-    var env, sig;
-    var volume = In.kr(volumeBus, 1);
-    
-    env = EnvGen.kr(Env.perc(0.01, rel), doneAction: 2);
-    sig = SinOsc.ar(freq) * env * amp * volume;
-    
-    Out.ar(out, sig!2);
-}).add;
+    // Track active synths for parameter updates
+    ~currentSynths = ~currentSynths ?? List.new;
+    ~noteCounter = ~noteCounter ?? 0;
 
-s.sync;
+    // Main transaction synth
+    SynthDef(\elektronBell, {
+        arg freq=440, amp=0.3,
+        atk=0.01, dec=0.3, rel=0.5,
+        tone=0.3, res=0.4, pan=0,
+        fmRatio=1.0, fmDepth=0.2,
+        grainSize=0.1, grainDensity=10,
+        filterFreq=1000, delayMix=0.2, reverbMix=0.3,
+        volumeBus=0, out=0;
 
-// Create the main monitor instance
-~mainMonitor.free;
-~mainMonitor = Synth.tail(s, \mainMonitor, [
-    \inMain, ~audioBuses.main,
-    \inTrans, ~audioBuses.transactions,
-    \inEffects, ~audioBuses.effects,
-    \out, 0,
-    \amp, 1
-]);
+        var env, sig, mod, carrier, grains, wet;
 
-"Synth definitions loaded successfully.".postln;
+        // Get volume from control bus
+        var midiAmp = In.kr(volumeBus, 1);
+
+        // Apply pitch offset
+        env = EnvGen.kr(
+            Env.new(
+                [0, 1, 0.5, 0],
+                [atk, dec, rel],
+                [-4, -2, -4]
+            ),
+            doneAction: 2
+        );
+
+        // FM Synthesis
+        mod = SinOsc.ar(freq * fmRatio) * fmDepth * freq;
+        carrier = SinOsc.ar(freq + mod);
+        sig = carrier * env;
+
+        // Filter
+        sig = RLPF.ar(
+            sig,
+            filterFreq,
+            res
+        );
+
+        // Granular processing
+        grains = GrainIn.ar(
+            2,
+            Dust.kr(grainDensity),
+            grainSize,
+            sig,
+            pan
+        );
+
+        sig = XFade2.ar(sig, grains, 0.5);
+
+        // Delay
+        wet = DelayC.ar(
+            sig,
+            0.5,
+            LFNoise2.kr(0.1).range(0.2, 0.4),
+            delayMix
+        );
+        sig = sig + wet;
+
+        // Reverb
+        sig = FreeVerb2.ar(
+            sig[0], sig[1],
+            reverbMix,
+            0.7,
+            0.5
+        );
+
+        // Final output
+        sig = sig * (amp * midiAmp);
+        sig = Balance2.ar(sig[0], sig[1], pan);
+
+        Out.ar(out, sig);
+    }).add;
+
+    // Transaction event synth
+    SynthDef(\transactionEvent, {
+        arg freq=880, amp=0.5,
+        atk=0.001, dec=0.1, rel=0.5,
+        filterFreq=3000, res=0.3, pan=0,
+        delayAmount=0.2, reverbAmount=0.3,
+        volumeBus=0, out=0;
+
+        var env, sig, wet;
+        var midiAmp = In.kr(volumeBus, 1);
+
+        // Simple envelope
+        env = EnvGen.kr(
+            Env.new(
+                [0, 1, 0.6, 0],
+                [atk, dec, rel],
+                [-2, -4, -4]
+            ),
+            doneAction: 2
+        );
+
+        // Simple FM bell
+        sig = SinOsc.ar(freq) * SinOsc.ar(freq * 1.5, 0, 0.5) * env;
+
+        // Filter
+        sig = RLPF.ar(sig, filterFreq, res);
+
+        // Stereo delay
+        wet = DelayN.ar(sig, 0.5, [0.25, 0.35], delayAmount);
+        sig = sig + wet;
+
+        // Reverb
+        sig = FreeVerb.ar(sig, reverbAmount, 0.7, 0.5);
+
+        // Pan and output
+        sig = Pan2.ar(sig, pan, amp * midiAmp);
+
+        Out.ar(out, sig);
+    }).add;
+
+    // Helper function to create synths with control buses
+    ~createNoteSynth = { |freq=440, amp=0.3, synth=\elektronBell|
+        var newSynth = Synth(synth, [
+            \freq, freq,
+            \amp, amp,
+            \volumeBus, ~controlBuses.volume.index,
+            \fmRatio, ~controlValues.fmratio,
+            \fmDepth, ~controlValues.fmdepth,
+            \grainSize, ~controlValues.grainsize,
+            \grainDensity, ~controlValues.graindensity,
+            \filterFreq, ~controlValues.filterfreq,
+            \delayMix, ~controlValues.delaymix,
+            \reverbMix, ~controlValues.reverbmix,
+            \out, ~audioBuses.main
+        ]);
+
+        ~currentSynths.add(newSynth);
+        ~noteCounter = (~noteCounter ? 0) + 1;
+
+        newSynth;
+    };
+
+    // Helper function to trigger transaction events
+    ~triggerTransaction = { |value=0.5, time=nil|
+        var density = value.clip(0, 1);
+        var txTime = time ? SystemClock.seconds;
+        var freq = 880 * (1 + (density * 0.5));
+
+        // Create transaction sound
+        ~createNoteSynth.(freq, 0.5 * density, \transactionEvent);
+
+        // Update beat engine parameters
+        if(~beatEngine.notNil) {
+            ~beatEngine.updateTransaction(txTime, density);
+        };
+    };
+
+    // Print initialization message
+    [
+        "Modified Synth Definitions loaded with MIDI/GUI integration",
+        "Control Buses initialized with default values.",
+        "Ready for ETH transaction sonification."
+    ].join("\n").postln;
+});
 )

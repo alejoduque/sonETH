@@ -1,8 +1,8 @@
 // SuperCollider Ethereum Sonification - Beat Engine
+
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 00:17:00
 // Current User's Login: alejoduque
 
-(
 // Initialize beat parameters
 ~beatParams = (
     beatTempo: 1.0,
@@ -25,31 +25,25 @@
 ~beatEngine = (
     running: false,
     routine: nil,
-    
     start: { |self|
         if(self.running.not) {
             var baseFreqs = [440, 660, 880];
-            
             self.running = true;
             self.routine = Routine({
                 var lastBeat = 0;
-                
                 loop {
                     var now = SystemClock.seconds;
                     var timeSinceLastTx = now - (~beatParams.lastTransactionTime ? now);
-                    var transactionInfluence = (~beatParams.transactionInfluence * 
-                        exp(timeSinceLastTx.neg * 0.5)).clip(0, 1);
+                    var transactionInfluence = (~beatParams.transactionInfluence *
+                    exp(timeSinceLastTx.neg * 0.5)).clip(0, 1);
                     var freq, amp, dec;
-                    
-                    freq = baseFreqs.choose * 
-                        (1 + (transactionInfluence * ~beatParams.transactionDensity * 0.5));
-                    
-                    amp = ~beatParams.masterAmp * 
-                        (0.3 + (transactionInfluence * 0.2));
-                    
-                    dec = ~beatParams.droneFade * 
-                        (1 + (transactionInfluence * 0.5));
-                    
+                    freq = baseFreqs.choose *
+                    (1 + (transactionInfluence * ~beatParams.transactionDensity * 0.5));
+                    amp = ~beatParams.masterAmp *
+                    (0.3 + (transactionInfluence * 0.2));
+                    dec = ~beatParams.droneFade *
+                    (1 + (transactionInfluence * 0.5));
+
                     Synth(\elektronBell, [
                         \out, ~audioBuses.main,
                         \freq, freq,
@@ -66,21 +60,18 @@
                         \grainDensity, ~beatParams.noiseLevel * 20,
                         \volumeBus, ~controlBuses.volume
                     ]);
-                    
-                    (1/~beatParams.beatTempo * 
-                        (1 + (transactionInfluence * -0.2))
+
+                    (1/~beatParams.beatTempo *
+                    (1 + (transactionInfluence * -0.2))
                     ).wait;
-                    
                     lastBeat = now;
                 };
             }).play;
-            
             "Beat engine started.".postln;
         } {
             "Beat engine already running".warn;
         };
     },
-    
     stop: { |self|
         if(self.running) {
             self.running = false;
@@ -91,7 +82,6 @@
             "Beat engine stopped.".postln;
         };
     },
-    
     cleanup: {
         ~beatEngine.stop;
         "Beat engine cleaned up".postln;
@@ -101,10 +91,7 @@
 s.waitForBoot({
     // Start the beat engine
     ~beatEngine.start;
-    
     // Register cleanup
     ServerQuit.add({ ~beatEngine.cleanup });
-    
     "Beat engine loaded with default parameters.".postln;
 });
-)

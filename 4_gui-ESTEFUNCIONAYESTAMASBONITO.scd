@@ -1,37 +1,88 @@
-// SuperCollider Ethereum Sonification - GUI System
+// SuperCollider Ethereum Sonification - GUI System (Enhanced)
 // Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-04 02:51:03
 // Current User's Login: alejoduque
 
 (
 {
     var success = true;
-    var statusView, counterView, controlView;
+    var statusView, counterView, controlView, controlViewRow2;
     var container;
+    var mainTheme, accentColor, backgroundColor, textColor;
 
     try {
-        // Create and store window with explicit bounds
-        ~mainWindow = Window("Ethereum Sonification Control", Rect(100, 100, 600, 400))
-            .layout_(VLayout());
+        // Define theme colors
+        mainTheme = (
+            background: Color.fromHexString("#1E1E2E"),
+            foreground: Color.fromHexString("#CDD6F4"),
+            accent: Color.fromHexString("#89B4FA"),
+            green: Color.fromHexString("#A6E3A1"),
+            red: Color.fromHexString("#F38BA8"),
+            yellow: Color.fromHexString("#F9E2AF"),
+            purple: Color.fromHexString("#CBA6F7")
+        );
 
-        // Create main container views
-        statusView = View().layout_(HLayout().margins_(20));
-        counterView = View().layout_(HLayout().margins_(20));
-        controlView = View().layout_(HLayout().margins_(20));
+        backgroundColor = mainTheme.background;
+        textColor = mainTheme.foreground;
+        accentColor = mainTheme.accent;
 
-        // Status indicator function
+        // Create and store window with explicit bounds and custom background color
+        ~mainWindow = Window("Ethereum Sonification Control", Rect(100, 100, 640, 500))
+            .background_(backgroundColor);
+
+        ~mainWindow.view.layout_(VLayout().margins_(15).spacing_(15));
+
+        // Create header
+        ~header = StaticText()
+            .string_("Ethereum Sonification")
+            .font_(Font("Helvetica", 24, true))
+            .align_(\center)
+            .stringColor_(mainTheme.purple);
+
+        // Create main container views with appealing spacing
+        statusView = View().background_(backgroundColor.blend(Color.black, 0.2))
+            .layout_(HLayout().margins_(15).spacing_(20));
+        counterView = View().background_(backgroundColor.blend(Color.black, 0.2))
+            .layout_(HLayout().margins_(15).spacing_(20));
+        controlView = View().background_(backgroundColor.blend(Color.black, 0.1))
+            .layout_(HLayout().margins_(15).spacing_(20));
+        controlViewRow2 = View().background_(backgroundColor.blend(Color.black, 0.1))
+            .layout_(HLayout().margins_(15).spacing_(20));
+
+        // Add rounded corners to all views
+        [statusView, counterView, controlView, controlViewRow2].do { |view|
+            view.fixedHeight = 120;
+            view.decorator = FlowLayout(view.bounds, 10@10, 10@10);
+        };
+
+        // Status indicator function with improved aesthetics
         ~makeStatusLight = { |label|
-            var container = View().layout_(HLayout());
-            var indicator = UserView(container)
-                .maxHeight_(20)
-                .maxWidth_(20)
+            var container, indicator, labelText;
+
+            container = View().background_(backgroundColor);
+            container.layout_(HLayout().margins_(5).spacing_(10));
+
+            indicator = UserView(container)
+                .maxHeight_(18)
+                .maxWidth_(18)
                 .drawFunc_({ |uview|
                     var state = uview.getProperty(\status) ? 0;
-                    Pen.fillColor = if(state == 1) { Color.green } { Color.red };
-                    Pen.addOval(Rect(0, 0, 20, 20));
+                    Pen.fillColor = if(state == 1) { mainTheme.green } { mainTheme.red };
+                    Pen.addOval(Rect(1, 1, 16, 16));
+                    Pen.fill;
+
+                    // Add glossy effect
+                    Pen.fillColor = Color.white.alpha_(0.3);
+                    Pen.addOval(Rect(4, 3, 6, 5));
                     Pen.fill;
                 });
 
-            container.layout.add(StaticText().string_(label).minWidth_(80));
+            labelText = StaticText()
+                .string_(label)
+                .stringColor_(textColor)
+                .font_(Font("Helvetica", 14))
+                .minWidth_(80);
+
+            container.layout.add(labelText);
             container.layout.add(indicator);
             indicator.setProperty(\status, 0);
             indicator;
@@ -50,15 +101,30 @@
             statusView.layout.add(light.parent);
         });
 
-        // Counter function
+        // Counter function with improved appearance
         ~makeCounter = { |label|
-            var container = View().layout_(HLayout());
-            var counter = NumberBox()
-                .enabled_(false)
-                .string_("0")
-                .minWidth_(50);
+            var container, counter, labelText;
 
-            container.layout.add(StaticText().string_(label).minWidth_(80));
+            container = View().background_(backgroundColor);
+            container.layout_(HLayout().margins_(5).spacing_(10));
+
+            counter = NumberBox()
+                .enabled_(false)
+                .background_(mainTheme.background.blend(Color.black, 0.3))
+                .normalColor_(mainTheme.yellow)
+                .typingColor_(mainTheme.yellow)
+                .stringColor_(mainTheme.yellow)
+                .font_(Font("Helvetica", 14, true))
+                .align_(\center)
+                .minWidth_(60);
+
+            labelText = StaticText()
+                .string_(label)
+                .stringColor_(textColor)
+                .font_(Font("Helvetica", 14))
+                .minWidth_(80);
+
+            container.layout.add(labelText);
             container.layout.add(counter);
             counter;
         };
@@ -76,7 +142,7 @@
             counterView.layout.add(counter.parent);
         });
 
-        // Store specs for control mapping
+        // Store specs for control mapping (unchanged)
         ~controlSpecs = (
             volume: ControlSpec(0, 1, \lin),
             fmratio: ControlSpec(0.5, 4, \exp),
@@ -90,29 +156,44 @@
             reverbmix: ControlSpec(0, 1, \lin)
         );
 
-        // Improved knob function with value display
+        // Reuse existing knob parameters structure
+        ~knobParameters = [
+            [\volume, \fmratio, \grainsize, \filterfreq, \pitchoffset],
+            [\fmdepth, \graindensity, \decay, \delaymix, \reverbmix]
+        ];
+
+        // Enhanced knob function with better aesthetics
         ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
-            var container = View().layout_(VLayout());
-            var knobContainer = View().layout_(HLayout());
-            var spec = ControlSpec(minVal, maxVal, mapping);
-            var knob = Knob()
+            var container, knobContainer, spec, knob, displayStr, valueLabel;
+
+            container = View().background_(backgroundColor);
+            container.layout_(VLayout().margins_(5).spacing_(5));
+
+            knobContainer = View().background_(backgroundColor);
+            knobContainer.layout_(HLayout().margins_(0).spacing_(0));
+
+            spec = ControlSpec(minVal, maxVal, mapping);
+            knob = Knob()
                 .maxHeight_(80)
                 .maxWidth_(80)
                 .mode_(\vert)
+                .color_([mainTheme.background, accentColor, mainTheme.foreground, mainTheme.foreground.alpha_(0.2)])
                 .value_(spec.unmap(defaultVal));
-            var displayStr = label.asString;
-            var valueLabel;
 
+            displayStr = label.asString;
             displayStr = displayStr[0].toUpper ++ displayStr[1..];
+
             valueLabel = StaticText()
                 .string_(displayStr ++ ": " ++ defaultVal.round(0.001))
+                .stringColor_(textColor)
+                .font_(Font("Helvetica", 12))
                 .align_(\center);
 
             knobContainer.layout.add(knob);
             container.layout.add(knobContainer);
             container.layout.add(valueLabel);
 
-            // Improved knob action with synchronous bus updates
+            // Improved knob action with synchronous bus updates (functionality unchanged)
             knob.action = { |k|
                 var mappedVal = spec.map(k.value);
                 try {
@@ -134,7 +215,7 @@
                 };
             };
 
-            // Store for updates
+            // Store for updates (unchanged)
             ~controlLabels = ~controlLabels ? ();
             ~controlLabels[label.toLower.asSymbol] = valueLabel;
             ~displayLabels = ~displayLabels ? ();
@@ -145,28 +226,50 @@
             container;
         };
 
-        // Create control knobs with proper ranges
-        ~knobs = (
-            volume: ~makeKnob.value("Volume", 0, 1, ~controlValues.volume ? 0.3),
-            fmratio: ~makeKnob.value("FmRatio", 0.5, 4, ~controlValues.fmratio ? 1.0, \exp),
-            grainsize: ~makeKnob.value("GrainSize", 0.01, 0.5, ~controlValues.grainsize ? 0.1, \exp),
-            filterfreq: ~makeKnob.value("FilterFreq", 200, 5000, ~controlValues.filterfreq ? 1000, \exp)
-        );
+        // Create first row control knobs
+        ~knobs = ();
+        ~knobParameters[0].do { |key|
+            ~knobs[key] = ~makeKnob.value(
+                key.asString,
+                ~controlSpecs[key].minval,
+                ~controlSpecs[key].maxval,
+                ~controlValues[key] ? ~controlSpecs[key].default,
+                ~controlSpecs[key].warp
+            );
+            controlView.layout.add(~knobs[key]);
+        };
 
-        // Add knobs to control view
-        ~knobs.keysValuesDo({ |key, knob|
-            controlView.layout.add(knob);
-        });
+        // Create second row control knobs
+        ~knobParameters[1].do { |key|
+            ~knobs[key] = ~makeKnob.value(
+                key.asString,
+                ~controlSpecs[key].minval,
+                ~controlSpecs[key].maxval,
+                ~controlValues[key] ? ~controlSpecs[key].default,
+                ~controlSpecs[key].warp
+            );
+            controlViewRow2.layout.add(~knobs[key]);
+        };
 
-        // Add all views to main window
+        // Add all views to main window with proper spacing
+        ~mainWindow.layout.add(~header);
         ~mainWindow.layout.add(statusView);
         ~mainWindow.layout.add(counterView);
         ~mainWindow.layout.add(controlView);
+        ~mainWindow.layout.add(controlViewRow2);
+
+        // Add footer with version info
+        ~footer = StaticText()
+            .string_("Ethereum Sonification v1.0")
+            .font_(Font("Helvetica", 10))
+            .align_(\right)
+            .stringColor_(textColor.alpha_(0.7));
+        ~mainWindow.layout.add(~footer);
 
         // Stop existing routine if it exists
         if(~guiRoutine.notNil) { ~guiRoutine.stop };
 
-        // Create update routine with improved refresh rate
+        // Create update routine with improved refresh rate (unchanged functionality)
         ~guiRoutine = Routine({
             loop {
                 {
@@ -206,7 +309,7 @@
             }
         }).play(AppClock);
 
-        // Set window cleanup
+        // Set window cleanup (unchanged)
         ~mainWindow.onClose = {
             ~guiRoutine.stop;
             ~guiRoutine = nil;

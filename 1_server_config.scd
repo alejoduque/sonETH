@@ -10,13 +10,13 @@ s.waitForBoot({
     s.options.maxNodes = 1024 * 32;
     s.options.numOutputBusChannels = 2;
     s.options.numInputBusChannels = 2;
-    
+
     s.sync;
-    
+
     // Create groups
     ~rootGroup = Group.new;
     ~mainGroup = Group.after(~rootGroup);
-    
+
     // Initialize control values first
     ~controlValues = (
         volume: 0.3,
@@ -30,14 +30,14 @@ s.waitForBoot({
         delaymix: 0.2,
         reverbmix: 0.3
     );
-    
+
     // Create audio buses
     ~audioBuses = (
         main: Bus.audio(s, 2),
         effects: Bus.audio(s, 2),
         transactions: Bus.audio(s, 2)
     );
-    
+
     // Create control buses
     ~controlBuses = (
         volume: Bus.control(s, 1).set(~controlValues.volume),
@@ -51,14 +51,14 @@ s.waitForBoot({
         delaymix: Bus.control(s, 1).set(~controlValues.delaymix),
         reverbmix: Bus.control(s, 1).set(~controlValues.reverbmix)
     );
-    
+
     // Audio parameters
     ~audioParams = (
         masterVolume: 0.5,
         transactionVolume: 0.3,
         beatVolume: 0.6
     );
-    
+
     // Control specs for MIDI and GUI
     ~controlSpecs = (
         volume: ControlSpec(0, 1, \lin),
@@ -72,23 +72,23 @@ s.waitForBoot({
         delaymix: ControlSpec(0, 1, \lin),
         reverbmix: ControlSpec(0, 1, \lin)
     );
-    
+
     // Create monitor synth
     SynthDef(\mainMonitor, {
         arg in=0, out=0, amp=1;
         var sig = In.ar(in, 2) * amp;
         Out.ar(out, sig);
     }).add;
-    
+
     s.sync;
-    
+
     // Create the monitor
     ~mainMonitor = Synth.tail(~rootGroup, \mainMonitor, [
         \in, ~audioBuses.main,
         \out, 0,
         \amp, 1
     ]);
-    
+
     // Test audio routing
     {
         SynthDef(\testBeep, {
@@ -97,32 +97,32 @@ s.waitForBoot({
             var sig = SinOsc.ar(freq) * env * amp;
             Out.ar(out, sig!2);
         }).add;
-        
+
         s.sync;
-        
+
         // Test direct output
         Synth(\testBeep, [\out, 0, \freq, 440]);
         0.5.wait;
-        
+
         // Test through bus system
         Synth(\testBeep, [\out, ~audioBuses.main, \freq, 880]);
-        
+
         "\nAudio System Status:".postln;
         "-------------------".postln;
         ("Main audio bus index: " ++ ~audioBuses.main.index).postln;
         ("Monitor synth active: " ++ ~mainMonitor.notNil).postln;
-        
+
         "\nControl System Status:".postln;
         "-------------------".postln;
         ~controlValues.keysValuesDo({ |key, val|
             ("Control '%': %".format(key, val)).postln;
         });
-        
+
         ~controlBuses.keysValuesDo({ |key, bus|
             ("Bus '%': %".format(key, bus.index)).postln;
         });
     }.fork;
-    
+
     // Helper functions for debugging
     ~checkAudio = {
         [
@@ -137,12 +137,12 @@ s.waitForBoot({
             "3. ~testTransaction.value;  // Test transaction sound"
         ].join("\n").postln;
     };
-    
+
     ~testBeep = {
         Synth(\testBeep, [\out, ~audioBuses.main, \freq, 880]);
         "Test beep triggered.".postln;
     };
-    
+
     // Register cleanup
     ServerQuit.add({
         if(~mainMonitor.notNil) { ~mainMonitor.free };
@@ -151,7 +151,69 @@ s.waitForBoot({
         ~rootGroup.free;
         ~mainGroup.free;
     });
-    
+
     "Server configuration complete.".postln;
 });
-)
+)// Add to 1_server_config.scd (at the beginning of the file)
+
+// Initial control values
+~controlValues = (
+    volume: 0.5,
+    fmratio: 1.0,
+    grainsize: 0.1,
+    filterfreq: 1000,
+    pitchoffset: 0.0,
+    fmdepth: 0.5,
+    graindensity: 10,
+    decay: 1.5,
+    delaymix: 0.3,
+    reverbmix: 0.3
+);
+
+// Create control buses BEFORE waitForBoot
+~controlBuses = (
+    volume: Bus.control(s, 1).set(~controlValues.volume),
+    fmratio: Bus.control(s, 1).set(~controlValues.fmratio),
+    grainsize: Bus.control(s, 1).set(~controlValues.grainsize),
+    filterfreq: Bus.control(s, 1).set(~controlValues.filterfreq),
+    pitchoffset: Bus.control(s, 1).set(~controlValues.pitchoffset),
+    fmdepth: Bus.control(s, 1).set(~controlValues.fmdepth),
+    graindensity: Bus.control(s, 1).set(~controlValues.graindensity),
+    decay: Bus.control(s, 1).set(~controlValues.decay),
+    delaymix: Bus.control(s, 1).set(~controlValues.delaymix),
+    reverbmix: Bus.control(s, 1).set(~controlValues.reverbmix)
+);
+
+// Audio parameters
+~audioParams = (
+    masterVolume: 0.5,
+    transactionVolume: 0.3,
+    beatVolume: 0.6
+);
+
+// Control specs for MIDI and GUI
+~controlSpecs = (
+    volume: ControlSpec(0, 1, \lin),
+    fmratio: ControlSpec(0.5, 4, \exp),
+    grainsize: ControlSpec(0.01, 0.5, \exp),
+    filterfreq: ControlSpec(200, 5000, \exp),
+    pitchoffset: ControlSpec(-12, 12, \lin),
+    fmdepth: ControlSpec(0, 1, \lin),
+    graindensity: ControlSpec(5, 50, \exp),
+    decay: ControlSpec(0.5, 3, \lin),
+    delaymix: ControlSpec(0, 1, \lin),
+    reverbmix: ControlSpec(0, 1, \lin)
+);
+
+s.waitForBoot {
+    // Existing code here (audio bus creation, etc.)
+    ~audioBuses = (
+        main: Bus.audio(s, 2),
+        fx: Bus.audio(s, 2)
+    );
+
+    "All buses created: % control, % audio".format(
+        ~controlBuses.size,
+        ~audioBuses.size
+    ).postln;
+};

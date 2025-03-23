@@ -91,7 +91,16 @@
         );
 
         // Improved knob function with value display
-        ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
+
+		~knobParameters = [
+			[\volume, \fmratio, \grainsize, \filterfreq, \pitchoffset],
+			[\fmdepth, \graindensity, \decay, \delaymix, \reverbmix]
+		];
+
+
+
+
+		~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
             var container = View().layout_(VLayout());
             var knobContainer = View().layout_(HLayout());
             var spec = ControlSpec(minVal, maxVal, mapping);

@@ -9,9 +9,9 @@
 ~components = [
     (
         file: ~baseDir +/+ "1_server_config.scd",
-        check: { 
-            ~rootGroup.notNil and: 
-            { ~audioBuses.notNil } and: 
+        check: {
+            ~rootGroup.notNil and:
+            { ~audioBuses.notNil } and:
             { ~mainMonitor.notNil }  // Add monitor check
         },
         waitTime: 2
@@ -22,18 +22,24 @@
         waitTime: 1
     ),
     (
-        file: ~baseDir +/+ "3_midi_control.scd",
-        check: { ~midiControl.notNil },
-        waitTime: 1
-    ),
-    (
-        file: ~baseDir +/+ "4_gui.scd",
-        check: { ~mainWindow.notNil and: { ~mainWindow.isClosed.not } },
-        waitTime: 1
-    ),
+		// file: ~baseDir +/+ "3_midi_control.scd",
+		// check: { ~midiControl.notNil },
+		// waitTime: 1
+		// ),
+		file: ~baseDir +/+ "3_midi_control.scd",
+		check: { ~midiControl.notNil },
+		waitTime: 1
+	),
+
+
+		(
+		file: ~baseDir +/+ "4_gui.scd",
+		check: { ~mainWindow.notNil and: { ~mainWindow.isClosed.not } },
+		waitTime: 1
+		),
     (
         file: ~baseDir +/+ "5_beat_engine.scd",
-        check: { 
+        check: {
             ~beatEngine.notNil and:
             { ~audioBuses.main.notNil }  // Verify bus exists
         },
@@ -63,50 +69,50 @@
 
 Routine({
     var loadStatus = Array.new(~components.size);
-    
+
     "=== Ethereum Sonification System Loader ===".postln;
     ("Base Directory: " ++ ~baseDir).postln;
-    
+
     // Make sure server is booted first
     Server.local.waitForBoot({
         // Give the server a moment to fully initialize
         2.wait;
-        
+
         // Clear existing resources
         if(~mainMonitor.notNil) { ~mainMonitor.free };
         if(~beatEngine.notNil and: { ~beatEngine.running }) { ~beatEngine.stop };
-        
+
         ~components.do({ |component, i|
             var success = false;
             var attempts = 0;
-            
+
             ("Loading [" ++ (i+1) ++ "/9]: " ++ component.file.basename).postln;
-            
+
             if(File.exists(component.file)) {
                 try {
                     component.file.load;
-                    
+
                     // Print debug info after server config
                     if(i == 0) {
                         ("Server config loaded - Main bus index: " ++ ~audioBuses.main.index).postln;
                     };
-                    
+
                     // Print debug info before beat engine
                     if(i == 4) {
                         ("Before beat engine - Main bus index: " ++ ~audioBuses.main.index).postln;
                     };
-                    
+
                     // Wait for the specified time
                     component.waitTime.wait;
-                    
-                    while { 
+
+                    while {
                         attempts = attempts + 1;
                         success = component.check.value;
                         success.not and: { attempts < 10 }
                     } {
                         0.2.wait;
                     };
-                    
+
                     loadStatus.add(success);
                     if(success) {
                         "✓ Loaded and initialized successfully".postln;
@@ -121,17 +127,17 @@ Routine({
                 ("File does not exist: " ++ component.file.basename).error;
                 loadStatus.add(false);
             };
-            
+
             // Additional wait between components
             1.wait;
         });
-        
+
         "\nLoad Summary:".postln;
         "Successful: %/%".format(
             loadStatus.count(true),
             loadStatus.size
         ).postln;
-        
+
         if(loadStatus.includes(false)) {
             "\nFailed components:".postln;
             loadStatus.do({ |status, i|
@@ -140,7 +146,7 @@ Routine({
                 };
             });
         };
-        
+
         // Final test of beat engine with debug info
         if(loadStatus.every(_ == true)) {
             "\nTesting beat engine:".postln;

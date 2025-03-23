@@ -1,7 +1,6 @@
 // SuperCollider Ethereum Sonification - OSC Handlers
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-03 22:51:45
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-03-06 03:01:35
 // Current User's Login: alejoduque
-// Initialization: 6/9
 
 (
 // Initialize OSC state
@@ -13,103 +12,99 @@
 
 // Initialize transaction counter if it doesn't exist
 ~transactionCounter = ~transactionCounter ?? { 0 };
+~noteCounter = ~noteCounter ?? { 0 };
 
-// Transaction handler
-~handleTransaction = { |msg|
-    var value = msg[1].asFloat;
-    var hash = msg[2].asString;
+// Note handler (for sound)
+~handleNote = { |msg|
+    var note = msg[1].asInteger;
+    var velocity = msg[2].asInteger;
+    var instrument = msg[3].asInteger;
+    var duration = msg[4].asFloat;
     
-    ~oscState.lastMessage = msg;
-    ~oscState.messageCount = ~oscState.messageCount + 1;
-    ~transactionCounter = ~transactionCounter + 1;  // Update counter for GUI
+    ~noteCounter = ~noteCounter + 1;
     
     if(~mainGroup.notNil) {
-        // Create synth with all control bus mappings
         Synth(\elektronBell, [
-            \freq, value.linexp(0, 10, 200, 1000),
-            \amp, value.linlin(0, 10, 0.1, 0.5) * ~audioParams.transactionVolume,
             \out, ~audioBuses.transactions,
-            // Add all control bus mappings
-            \volumeBus, ~controlBuses.volume,
-            \fmRatioBus, ~controlBuses.fmratio,
-            \grainSizeBus, ~controlBuses.grainsize,
-            \filterFreqBus, ~controlBuses.filterfreq,
-            \pitchOffsetBus, ~controlBuses.pitchoffset,
-            \fmDepthBus, ~controlBuses.fmdepth,
-            \grainDensityBus, ~controlBuses.graindensity,
-            \decayBus, ~controlBuses.decay,
-            \delayMixBus, ~controlBuses.delaymix,
-            \reverbMixBus, ~controlBuses.reverbmix
+            \freq, note.midicps,
+            \amp, velocity.linlin(0, 127, 0.1, 0.5),
+            \att, 0.01,
+            \dec, duration * 0.5,
+            \rel, duration * 0.5,
+            // MIDI control mappings
+            \volumeBus, ~controlBuses.volume,      // CC 7
+            \fmRatioBus, ~controlBuses.fmratio,   // CC 16
+            \fmDepthBus, ~controlBuses.fmdepth,   // CC 17
+            \filterFreqBus, ~controlBuses.filterfreq // CC 74
         ], ~mainGroup);
-        
-        // Update trend analysis if available
-        ~trendAnalysis !? {
-            ~trendAnalysis.addValue(value);
-        };
     };
     
-    // Update GUI elements
     {
-        ~valueDisplay !? {
-            ~valueDisplay.string = "Last Value: % ETH".format(value.round(0.001))
-        };
-        
-        // Update last transaction info in GUI if available
-        if(~gui.notNil) {
-            ~gui.lastTxInfo = "TX: % (% ETH)".format(
-                hash[0..7],  // Show first 8 characters of hash
-                value.round(0.001)
-            );
+        if(~counters.notNil and: { ~counters.notes.notNil }) {
+            ~counters.notes.string = ~noteCounter.asString;
         };
     }.defer;
 };
 
-// OSC definition for transactions
-OSCdef(\transactionHandler, { |msg, time, addr, port|
-    ~handleTransaction.value(msg);
-}, '/eth/transaction');
-
-// Add OSC definition for control messages
-OSCdef(\controlHandler, { |msg, time, addr, port|
-    var control = msg[1].asSymbol;
+// Transaction info handler (for display)
+~handleTxInfo = { |msg|
+    var txHash = msg[1].asString;
     var value = msg[2].asFloat;
+    var gasPrice = msg[3].asFloat;
+    var recipient = msg[4].asString;
     
-    // Update appropriate control bus if it exists
-    ~controlBuses[control] !? { |bus|
-        bus.set(value);
-        ~controlValues[control] = value;
-        "Control %: %".format(control, value).postln;
+    ~transactionCounter = ~transactionCounter + 1;
+    
+    // Update transaction density for beat engine
+    ~beatParams.transactionDensity = (~transactionCounter / (SystemClock.seconds - ~oscState.startTime)).clip(0, 1);
+    ~beatParams.lastTransactionTime = SystemClock.seconds;
+    
+    {
+        if(~counters.notNil and: { ~counters.trans.notNil }) {
+            ~counters.trans.string = ~transactionCounter.asString;
+        };
+        
+        // Update transaction display if it exists
+        if(~valueDisplay.notNil) {
+            ~valueDisplay.string = "TX: % (% ETH, % gwei)"
+                .format(txHash[0..7], value.round(0.001), gasPrice.round(0.1));
+        };
+    }.defer;
+};
+
+// OSC definitions
+OSCdef(\note, { |msg, time, addr, port|
+    ~handleNote.value(msg);
+}, '/eth/note');
+
+OSCdef(\txInfo, { |msg, time, addr, port|
+    ~handleTxInfo.value(msg);
+}, '/eth/tx_info');
+
+// Start decay routine for transaction density
+~decayRoutine.stop if: ~decayRoutine.notNil;
+~decayRoutine = Routine {
+    loop {
+        if((SystemClock.seconds - ~beatParams.lastTransactionTime) > 5.0) {
+            ~beatParams.transactionDensity = ~beatParams.transactionDensity * 0.95;
+        };
+        0.5.wait;
     };
-}, '/eth/control');
+}.play;
 
-// Test function for transactions
-~testTransaction = {
-    ~handleTransaction.value([
-        '/eth/transaction',
-        1.5,  // value in ETH
-        "0x123test",  // hash
-        SystemClock.seconds  // timestamp
-    ]);
-    "Test transaction triggered.".postln;
-};
+// Register cleanup
+ServerQuit.add({ 
+    OSCdef(\note).free;
+    OSCdef(\txInfo).free;
+    ~decayRoutine.stop;
+});
 
-// Test function for controls
-~testControl = { |control, value|
-    OSCdef(\controlHandler).value([
-        '/eth/control',
-        control,
-        value
-    ], SystemClock.seconds, nil, 57120);
-    "Test control: % -> %".format(control, value).postln;
-};
-
-// Print status
 [
     "OSC Handlers initialized:",
-    "- Listening on port: 57120",
-    "- Transaction sonification ready",
-    "- Control messages enabled",
-    "- Use ~testTransaction.value; to test transactions",
-    "- Use ~testControl.value(\\control, value); to test controls",
+    "- Listening for notes on /eth/note",
+    "- Listening for transaction info on /eth/tx_info",
+    "- Transaction counter: %".format(~transactionCounter),
+    "- Note counter: %".format(~noteCounter),
+    "- Using MIDI controls for sound parameters"
 ].join("\n").postln;
 )

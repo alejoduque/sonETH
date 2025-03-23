@@ -30,7 +30,7 @@
                     Pen.addOval(Rect(0, 0, 20, 20));
                     Pen.fill;
                 });
-
+            
             container.layout.add(StaticText().string_(label).minWidth_(80));
             container.layout.add(indicator);
             indicator.setProperty(\status, 0);
@@ -57,7 +57,7 @@
                 .enabled_(false)
                 .string_("0")
                 .minWidth_(50);
-
+            
             container.layout.add(StaticText().string_(label).minWidth_(80));
             container.layout.add(counter);
             counter;
@@ -102,16 +102,16 @@
                 .value_(spec.unmap(defaultVal));
             var displayStr = label.asString;
             var valueLabel;
-
+            
             displayStr = displayStr[0].toUpper ++ displayStr[1..];
             valueLabel = StaticText()
                 .string_(displayStr ++ ": " ++ defaultVal.round(0.001))
                 .align_(\center);
-
+            
             knobContainer.layout.add(knob);
             container.layout.add(knobContainer);
             container.layout.add(valueLabel);
-
+            
             // Improved knob action with synchronous bus updates
             knob.action = { |k|
                 var mappedVal = spec.map(k.value);
@@ -119,7 +119,7 @@
                     ~controlBuses[label.toLower.asSymbol].setSynchronous(mappedVal);
                     ~controlValues[label.toLower.asSymbol] = mappedVal;
                     valueLabel.string = displayStr ++ ": " ++ mappedVal.round(0.001);
-
+                    
                     // Update active synths immediately
                     if(~currentSynths.notNil) {
                         ~currentSynths.do { |synth|
@@ -133,7 +133,7 @@
                     };
                 };
             };
-
+            
             // Store for updates
             ~controlLabels = ~controlLabels ? ();
             ~controlLabels[label.toLower.asSymbol] = valueLabel;
@@ -141,7 +141,7 @@
             ~displayLabels[label.toLower.asSymbol] = displayStr;
             ~knobViews = ~knobViews ? ();
             ~knobViews[label.toLower.asSymbol] = knob;
-
+            
             container;
         };
 
@@ -191,7 +191,7 @@
                                 if(spec.notNil) {
                                     ~knobViews[key].value = spec.unmap(val);
                                     if(~controlLabels[key].notNil) {
-                                        ~controlLabels[key].string =
+                                        ~controlLabels[key].string = 
                                             ~displayLabels[key] ++ ": " ++ val.round(0.001);
                                     };
                                 };
