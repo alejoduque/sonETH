@@ -1,0 +1,193 @@
+// SuperCollider Ethereum Sonification - Server Configuration
+// Current Date and Time (UTC): 2025-03-01 22:36:00
+// Current User's Login: alejoduque
+// Initialization Sequence: 2 of 9
+// Depends on: 0_init.scd
+// Required by: all other components
+
+(
+// Server configuration
+Server.default.options.numBuffers = 1024 * 16;
+Server.default.options.memSize = 8192 * 16;
+Server.default.options.maxNodes = 1024 * 32;
+Server.default.options.numOutputBusChannels = 4;  // Enable 4-channel output for spatial audio
+Server.default.options.numInputBusChannels = 2;
+
+// Create initialization routine
+~serverInitRoutine = Routine({
+    // Boot server if not already running
+    if(Server.default.serverRunning.not) {
+        "Booting server...".postln;
+        Server.default.boot;
+        Server.default.waitForBoot;
+        2.wait;
+    };
+    
+    "Server booted, initializing components...".postln;
+    
+    // Create server status check function
+    ~checkServerStatus = {
+        (
+            "\nServer Status:".postln;
+            "- Running: %".format(Server.default.serverRunning).postln;
+            "- Average CPU: % %".format(Server.default.avgCPU.round(0.1), "%").postln;
+            "- Peak CPU: % %".format(Server.default.peakCPU.round(0.1), "%").postln;
+            "- Active Synths: %".format(Server.default.numSynths).postln;
+        )
+    };
+    
+    // Create default group if not exists
+    if(Group.basicNew(s, 1).isPlaying.not) {
+        Group(s, \addToHead);
+    };
+    
+    // Setup audio buses
+    ~audioBuses = (
+        main: Bus.audio(s, 2),
+        effects: Bus.audio(s, 2),
+        transactions: Bus.audio(s, 2)
+    );
+    
+    // Setup control buses
+    ~controlBuses = (
+        volume: Bus.control(s, 1).set(~audioParams.masterVolume),
+        transactionVolume: Bus.control(s, 1).set(~audioParams.transactionVolume),
+        beatVolume: Bus.control(s, 1).set(~audioParams.beatVolume)
+    );
+    
+    // Setup OSC
+    if(NetAddr.langPort != 57120) {
+        "Warning: SuperCollider is not using default OSC port 57120".warn;
+    };
+    
+    // Test sound function
+    ~testSound = {
+        {
+            var env = EnvGen.kr(Env.perc(0.01, 0.5), doneAction: 2);
+            var sig = SinOsc.ar(440) * env * 0.1;
+            Out.ar(0, sig ! 2);
+        }.play;
+    };
+    
+    // Test control responsiveness with sustained synth
+    ~testControlBuses = {
+        "Testing control bus connections...".postln;
+        if(~buses.notNil) {
+            // Create a sustained synth for testing controls
+            ~testSynth = {
+                var freq = 220;  // Low frequency base
+                var sig, env, mod;
+                
+                // Read control buses directly
+                var masterVol = In.kr(~buses[\masterVolume].index, 1);
+                var pitchOffset = In.kr(~buses[\pitchShift].index, 1);
+                var harmonicRich = In.kr(~buses[\harmonicRich].index, 1);
+                var spectralShift = In.kr(~buses[\spectralShift].index, 1);
+                
+                // Apply pitch shift
+                freq = freq * (pitchOffset / 12).midiratio;
+                
+                // Simple FM synthesis
+                mod = SinOsc.ar(freq * harmonicRich) * (harmonicRich * 0.2) * freq;
+                sig = SinOsc.ar(freq + mod);
+                
+                // Filter
+                sig = RLPF.ar(sig, spectralShift.clip(80, 8000), 0.3);
+                
+                // Sustain envelope
+                env = EnvGen.kr(Env.asr(0.1, 1, 0.5), gate: 1);
+                sig = sig * env * masterVol.squared * 0.2;
+                
+                Out.ar(0, sig ! 2);
+            }.play;
+            
+            "Sustained test synth created - move controls and hear changes!".postln;
+            "Use ~testSynth.free; to stop".postln;
+        } {
+            "Control buses not initialized yet!".warn;
+        };
+    };
+    
+    // Debug function to check bus status - check all possible bus variables
+    ~checkBuses = {
+        "=== DEBUGGING CONTROL BUSES ===".postln;
+        "~buses exists: %".format(~buses.notNil).postln;
+        "~controlBuses exists: %".format(~controlBuses.notNil).postln;
+        "~soundParams exists: %".format(~soundParams.notNil).postln;
+        
+        // Check each possible bus container
+        if(~buses.notNil) {
+            "~buses contains % items:".format(~buses.size).postln;
+            ~buses.keysValuesDo { |name, bus|
+                try {
+                    var value = bus.getSynchronous;
+                    "  % -> Bus[%] = %".format(name, bus.index, value.round(0.001)).postln;
+                } { |error|
+                    "  % -> ERROR: %".format(name, error.errorString).postln;
+                };
+            };
+        };
+        
+        if(~controlBuses.notNil) {
+            "~controlBuses contains % items:".format(~controlBuses.size).postln;
+            ~controlBuses.keysValuesDo { |name, bus|
+                try {
+                    var value = bus.getSynchronous;
+                    "  % -> Bus[%] = %".format(name, bus.index, value.round(0.001)).postln;
+                } { |error|
+                    "  % -> ERROR: %".format(name, error.errorString).postln;
+                };
+            };
+        };
+        
+        "Active synths: %".format(s.numSynths).postln;
+        "================================".postln;
+    };
+    
+    // Create a test synth that explicitly shows bus changes
+    ~testBusConnection = {
+        "Creating test synth with visible bus response...".postln;
+        "Checking ~buses: %".format(~buses.notNil).postln;
+        
+        if(~buses.notNil and: { ~buses.size > 0 }) {
+            "Found buses, creating test synth...".postln;
+            ~debugSynth = {
+                var masterVol = In.kr(~buses[\masterVolume].index, 1);
+                var pitchShift = In.kr(~buses[\pitchShift].index, 1);
+                var spectralShift = In.kr(~buses[\spectralShift].index, 1);
+                
+                // Create obvious test sound that clearly shows parameter changes
+                var freq = 440 * (pitchShift / 12).midiratio;  // Pitch shift effect
+                var sig = SinOsc.ar(freq) * masterVol.squared * 0.3;  // Volume effect
+                sig = LPF.ar(sig, spectralShift.clip(200, 4000));  // Filter effect
+                
+                // Send to both speakers
+                Out.ar(0, sig ! 2);
+                
+                // Print bus values every second for debugging
+                Impulse.kr(1).poll(0, masterVol, "masterVolume");
+                Impulse.kr(1).poll(0, pitchShift, "pitchShift");
+                Impulse.kr(1).poll(0, spectralShift, "spectralShift");
+            }.play;
+            "Test synth running - move GUI knobs to hear CLEAR changes!".postln;
+            "Use ~debugSynth.free; to stop".postln;
+        } {
+            "ERROR: Buses not available! ~buses = %".format(~buses).error;
+            "This means buses aren't created yet when this function runs".postln;
+        };
+    };
+    
+    // Server cleanup on shutdown
+    ServerQuit.add({ 
+        "Cleaning up server resources...".postln;
+        ~audioBuses.do(_.free);
+        ~controlBuses.do(_.free);
+    });
+    
+    "Server configuration loaded and ready.".postln;
+    ~checkServerStatus.value;
+});
+
+// Run the initialization routine
+SystemClock.play(~serverInitRoutine);
+)
