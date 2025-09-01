@@ -16,14 +16,13 @@
     
     // Load components in sequence
     [
-        "0_server_config.scd",    // Server config first
-        "1_init.scd",            // Basic initialization
-        "2_midi_control.scd",    // MIDI setup
-        "3_synthdefs.scd",       // Additional SynthDefs
-        "4_gui.scd",             // GUI components
-        "5_beat_engine.scd",     // Beat engine
-        "6_osc_handlers.scd",    // OSC handlers
-        "7_trend_analysis.scd",  // Analysis
+        "1_server_config.scd",      // Server config and buses
+        "2_midi_control.scd",       // MIDI setup
+        "3_synthdefs.scd",          // SynthDefs with real-time control
+        "4_gui.scd",                // Enhanced GUI with Lawrence English controls
+        "5_beat_engine.scd",        // Beat engine with bus connections
+        "6_osc_handlers.scd",       // OSC handlers for transactions
+        "7_trend_analysis.scd",     // Analysis
         "8_transaction_buffer.scd", // Transaction management
         "9_spatial_headphone_sim.scd" // 4-channel headphone simulation
     ].do { |file|
