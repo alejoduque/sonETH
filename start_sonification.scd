@@ -24,7 +24,8 @@
         "6_osc_handlers.scd",       // OSC handlers for transactions
         "7_trend_analysis.scd",     // Analysis
         "8_transaction_buffer.scd", // Transaction management
-        "9_spatial_headphone_sim.scd" // 4-channel headphone simulation
+        "9_spatial_headphone_sim.scd", // 4-channel headphone simulation
+        "10_sample_system.scd"      // Sample playback system with paulstretch
     ].do { |file|
         var path = basePath +/+ file;
         ("Loading " ++ file ++ "...").postln;
@@ -66,6 +67,12 @@
     "".postln;
     "3. Run the Ethereum data fetcher:".postln;
     "   python eth_sonification/eth_sonify.py".postln;
+    "".postln;
+    "=== Sample Playback Setup ===".postln;
+    "Sample trigger functions available:".postln;
+    "   ~triggerSample.(index) - Play sample by index (0-6)".postln;
+    "   ~stopSample.() - Stop current sample".postln;
+    "   ~listSamples.() - List available samples".postln;
     "".postln;
     "=== Spatial Audio Setup ===".postln;
     "For headphone development (simulates 4-channel monitors):".postln;

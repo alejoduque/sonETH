@@ -6,6 +6,7 @@
 // Defer all GUI creation to AppClock to avoid Qt threading issues
 {
     var statusView, counterView, controlView, controlViewRow2, controlViewRow3, controlViewRow4;
+    var sampleView, sampleControlView, sampleHeader, sampleButtonView, stopButton;
     var container;
     var mainTheme, accentColor, backgroundColor, textColor;
     
@@ -28,8 +29,8 @@
         textColor = mainTheme.foreground;
         accentColor = mainTheme.accent;
 
-        // Create and store window with enhanced styling (larger for merged controls)
-        ~mainWindow = Window("Ethereum Sonification Control - MERGED", Rect(100, 100, 800, 700))
+        // Create and store window with enhanced styling (larger for merged controls + samples)
+        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES", Rect(100, 100, 1100, 1020))
             .background_(backgroundColor);
 
         ~mainWindow.view.layout_(VLayout().margins_(15).spacing_(15));
@@ -41,7 +42,7 @@
             .align_(\center)
             .stringColor_(mainTheme.purple);
 
-        // Create main container views for merged controls
+        // Create main container views for merged controls + samples
         statusView = View().background_(backgroundColor.blend(Color.black, 0.2))
             .layout_(HLayout().margins_(15).spacing_(20));
         counterView = View().background_(backgroundColor.blend(Color.black, 0.2))
@@ -54,12 +55,20 @@
             .layout_(HLayout().margins_(15).spacing_(20));
         controlViewRow4 = View().background_(backgroundColor.blend(Color.black, 0.1))
             .layout_(HLayout().margins_(15).spacing_(20));
+        
+        // Create sample views
+        sampleView = View().background_(backgroundColor.blend(mainTheme.purple, 0.05))
+            .layout_(VLayout().margins_(15).spacing_(10));
+        sampleControlView = View().background_(backgroundColor.blend(Color.black, 0.1))
+            .layout_(HLayout().margins_(15).spacing_(15));
 
         // Set fixed heights for sections
         [statusView, counterView].do { |view| view.fixedHeight = 80; };
         [controlView, controlViewRow2, controlViewRow3, controlViewRow4].do { |view| 
             view.fixedHeight = 120; 
         };
+        sampleView.fixedHeight = 180;
+        sampleControlView.fixedHeight = 120;
 
         // Status indicator function with oscilloscope styling
         ~makeStatusLight = { |label|
@@ -325,7 +334,176 @@
             controlViewRow4.layout.add(~knobs[key]);
         };
 
-        // Add all views to main window (all 4 control rows)
+        // Create sample trigger buttons
+        ~sampleNames = [
+            "Aullidos", "Aves/Insectos", "Bats", "Dreamliner", 
+            "Oropendola", "Ranas", "Tape"
+        ];
+        
+        // Sample section header
+        sampleHeader = StaticText()
+            .string_("SAMPLE TRIGGERS")
+            .font_(Font("Helvetica", 16, true))
+            .align_(\center)
+            .stringColor_(mainTheme.purple);
+        
+        // Create sample button container
+        sampleButtonView = View().background_(backgroundColor)
+            .layout_(HLayout().margins_(10).spacing_(8));
+        
+        // Create sample buttons
+        ~sampleButtons = [];
+        ~sampleNames.do { |name, i|
+            var button = Button()
+                .states_([
+                    [name, textColor, backgroundColor.blend(mainTheme.purple, 0.1)],
+                    [name, backgroundColor, mainTheme.purple]
+                ])
+                .font_(Font("Helvetica", 10))
+                .maxHeight_(40)
+                .action_({ |btn|
+                    if(btn.value == 1) {
+                        "Triggering sample: %".format(name).postln;
+                        if(~triggerSample.notNil) {
+                            ~triggerSample.(i);
+                        } {
+                            "Sample system not loaded yet!".warn;
+                        };
+                        // Auto-release button after trigger
+                        { btn.value = 0; }.defer(0.1);
+                    };
+                });
+            
+            ~sampleButtons = ~sampleButtons.add(button);
+            sampleButtonView.layout.add(button);
+        };
+        
+        // Add stop button
+        stopButton = Button()
+            .states_([["STOP ALL", textColor, backgroundColor.blend(mainTheme.red, 0.2)]])
+            .font_(Font("Helvetica", 10, true))
+            .maxHeight_(40)
+            .action_({
+                "Stopping all samples".postln;
+                if(~stopAllSamples.notNil) {
+                    ~stopAllSamples.();
+                } {
+                    if(~stopSample.notNil) {
+                        ~stopSample.();
+                    };
+                };
+            });
+        sampleButtonView.layout.add(stopButton);
+        
+        sampleView.layout.add(sampleHeader);
+        sampleView.layout.add(sampleButtonView);
+
+
+        // Create sample control knobs
+        ~sampleControlSpecs = (
+            timeStretch: ControlSpec(0.25, 8.0, \exp),
+            samplePitch: ControlSpec(-24, 24, \lin),
+            sampleReverb: ControlSpec(0, 1, \lin),
+            sampleDelay: ControlSpec(0, 1, \lin),
+            delayTime: ControlSpec(0.1, 2.0, \exp),
+            grainSize: ControlSpec(0.05, 1.0, \exp)
+        );
+
+        ~sampleControlValues = (
+            timeStretch: 1.0,
+            samplePitch: 0.0,
+            sampleReverb: 0.3,
+            sampleDelay: 0.2,
+            delayTime: 0.5,
+            grainSize: 0.2
+        );
+
+        // Enhanced sample knob function with bus connections
+        ~makeSampleKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
+            var container, knobContainer, spec, knob, displayStr, valueLabel, functionLabel, paramName;
+
+            container = View().background_(backgroundColor);
+            container.layout_(VLayout().margins_(5).spacing_(3));
+
+            knobContainer = View().background_(backgroundColor);
+            knobContainer.layout_(HLayout().margins_(0).spacing_(0));
+
+            spec = ControlSpec(minVal, maxVal, mapping);
+            knob = Knob()
+                .maxHeight_(70)
+                .maxWidth_(70)
+                .mode_(\vert)
+                .color_([mainTheme.background, Color.cyan, mainTheme.foreground, mainTheme.foreground.alpha_(0.2)])
+                .value_(spec.unmap(defaultVal));
+
+            displayStr = label.asString;
+            displayStr = displayStr[0].toUpper ++ displayStr[1..];
+
+            valueLabel = StaticText()
+                .string_(displayStr ++ ": " ++ defaultVal.round(0.001))
+                .stringColor_(Color.cyan)  // Clear blue color for paulstretch knobs
+                .font_(Font("Monaco", 9))
+                .align_(\center);
+
+            // Add function description label
+            functionLabel = StaticText()
+                .string_(switch(label.asSymbol,
+                    \timeStretch, "TIME STRETCH",
+                    \samplePitch, "PITCH SHIFT", 
+                    \sampleReverb, "REVERB",
+                    \sampleDelay, "DELAY",
+                    \delayTime, "DELAY TIME",
+                    \grainSize, "GRAIN SIZE",
+                    displayStr.toUpper
+                ))
+                .stringColor_(Color.cyan.alpha_(0.8))
+                .font_(Font("Helvetica", 8, true))
+                .align_(\center);
+
+            knobContainer.layout.add(knob);
+            container.layout.add(knobContainer);
+            container.layout.add(valueLabel);
+            container.layout.add(functionLabel);
+
+            // Define parameter name for sample bus connection
+            paramName = label.asSymbol;
+            
+            // Sample knob action with sample bus updates
+            knob.action = { |k|
+                var mappedVal = spec.map(k.value);
+                "Sample Knob % moved: value=%".format(paramName, mappedVal.round(0.001)).postln;
+                if(~sampleBuses.notNil and: {~sampleBuses[paramName].notNil}) {
+                    ~sampleBuses[paramName].set(mappedVal);
+                    ~sampleControlValues[paramName] = mappedVal;
+                    valueLabel.string = displayStr ++ ": " ++ mappedVal.round(0.001);
+                    valueLabel.stringColor = Color.cyan;  // Keep blue color on updates
+                    "Sample Bus % set to %".format(paramName, mappedVal.round(0.001)).postln;
+                } {
+                    "WARNING: Sample Bus % not found!".format(paramName).warn;
+                };
+            };
+
+            container;
+        };
+
+        // Create sample parameter knobs
+        ~sampleKnobs = ();
+        ~sampleControlSpecs.keysValuesDo { |key, spec|
+            ~sampleKnobs[key] = ~makeSampleKnob.value(
+                key.asString,
+                spec.minval,
+                spec.maxval,
+                ~sampleControlValues[key],
+                spec.warp
+            );
+            sampleControlView.layout.add(~sampleKnobs[key]);
+        };
+        
+        // Add sample control knobs to sample view
+        sampleView.layout.add(sampleControlView);
+
+
+        // Add all views to main window (all 4 control rows + samples)
         ~mainWindow.layout.add(~header);
         ~mainWindow.layout.add(statusView);
         ~mainWindow.layout.add(counterView);
@@ -333,10 +511,11 @@
         ~mainWindow.layout.add(controlViewRow2);
         ~mainWindow.layout.add(controlViewRow3);
         ~mainWindow.layout.add(controlViewRow4);
+        ~mainWindow.layout.add(sampleView);
 
         // Add footer
         ~footer = StaticText()
-            .string_("Ethereum Sonification v2.0 - Spatial Audio Ready")
+            .string_("Ethereum Sonification v2.0 - Spatial Audio + Samples Ready")
             .font_(Font("Monaco", 8))  // 2px smaller
             .align_(\right)
             .stringColor_(textColor.alpha_(0.8));  // Slightly more visible
@@ -375,11 +554,13 @@
             ~knobs = nil;
             ~controlLabels = nil;
             ~knobViews = nil;
+            ~sampleButtons = nil;
+            ~sampleKnobs = nil;
         };
 
         ~mainWindow.front;
         "Enhanced GUI System loaded successfully.".postln;
-        "GUI includes: Status lights, Counters, MIDI-synced knobs".postln;
+        "GUI includes: Status lights, Counters, MIDI-synced knobs, Sample triggers".postln;
         
     } { |error|
         "GUI initialization failed: %".format(error.errorString).error;
