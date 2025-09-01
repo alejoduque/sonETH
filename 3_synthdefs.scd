@@ -3,8 +3,13 @@
 // Current User's Login: alejoduque
 
 (
-// Wait for server to be ready
+// Wait for server to be ready and create proper group structure
 s.waitForBoot({
+    // Ensure default group exists
+    if(~defaultGroup.isNil or: { ~defaultGroup.isPlaying.not }) {
+        ~defaultGroup = Group.new(s, \addToHead);
+    };
+    s.sync;
 
     // MERGED CONTROL PARAMETERS - Lawrence English ambient + existing drone/noise controls
     ~globalParams = (

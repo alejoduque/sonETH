@@ -25,6 +25,13 @@ Server.default.options.numInputBusChannels = 2;
     
     "Server booted, initializing components...".postln;
     
+    // Define audio parameters first
+    ~audioParams = (
+        masterVolume: 0.5,
+        transactionVolume: 0.3,
+        beatVolume: 0.6
+    );
+    
     // Create server status check function
     ~checkServerStatus = {
         (
@@ -36,10 +43,9 @@ Server.default.options.numInputBusChannels = 2;
         )
     };
     
-    // Create default group if not exists
-    if(Group.basicNew(s, 1).isPlaying.not) {
-        Group(s, \addToHead);
-    };
+    // Create default group properly
+    ~defaultGroup = Group.new(s, \addToHead);
+    s.sync;  // Wait for group creation
     
     // Setup audio buses
     ~audioBuses = (
