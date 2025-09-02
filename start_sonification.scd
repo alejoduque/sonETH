@@ -26,7 +26,8 @@
         "8_transaction_buffer.scd", // Transaction management
         "9_spatial_headphone_sim.scd", // 4-channel headphone simulation
         "10_sample_system.scd",     // Sample playback system with paulstretch
-        "11_recording_system.scd"   // Multichannel recording system
+        "11_recording_system.scd",  // Multichannel recording system
+        "13_parliament_system.scd"  // Parliament of All Things integration
     ].do { |file|
         var path = basePath +/+ file;
         ("Loading " ++ file ++ "...").postln;
@@ -85,6 +86,13 @@
     "=== Spatial Control Setup ===".postln;
     "Spatial GUI: Use 'SPATIAL GUI' button in main interface".postln;
     "Manual loading: (thisProcess.nowExecutingPath.dirname +/+ \"12_spatial_gui.scd\").load".postln;
+    "".postln;
+    "=== Parliament of All Things Setup ===".postln;
+    "Democratic ecological governance affecting base synthesis:".postln;
+    "  ~startParliamentSystem.() - Start democratic modulation".postln;
+    "  ~simulateVote.(\"biodiversity protection\") - Simulate vote".postln;
+    "  ~emergencyResponse.(0.8) - Ecological emergency mode".postln;
+    "  ~testParliament.() - Test parliament integration".postln;
     "".postln;
     "=== Spatial Audio Setup ===".postln;
     "For headphone development (simulates 4-channel monitors):".postln;

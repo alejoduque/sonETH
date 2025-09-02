@@ -29,8 +29,8 @@
         textColor = mainTheme.foreground;
         accentColor = mainTheme.accent;
 
-        // Create and store window with enhanced styling (larger for merged controls + samples + recording)
-        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES", Rect(100, 100, 1100, 1120))
+        // Create and store window with enhanced styling (larger for merged controls + samples + recording + parliament)
+        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES + PARLIAMENT", Rect(100, 100, 1100, 1300))
             .background_(backgroundColor);
 
         ~mainWindow.view.layout_(VLayout().margins_(15).spacing_(15));
@@ -562,7 +562,117 @@
         recordingView.layout.add(~quickRecButton);
         recordingView.layout.add(~spatialGuiButton);
         
-        // Add all views to main window (all 4 control rows + samples + recording)
+        // Create Parliament of All Things panel
+        container = View().background_(backgroundColor.blend(mainTheme.purple, 0.05))
+            .layout_(VLayout().margins_(15).spacing_(10));
+        container.fixedHeight = 180;
+        
+        // Parliament header
+        container.layout.add(StaticText()
+            .string_("PARLIAMENT OF ALL THINGS - Colombian Biodiversity Democracy")
+            .font_(Font("Helvetica", 14, true))
+            .align_(\center)
+            .stringColor_(mainTheme.purple)
+        );
+        
+        // Parliament status row
+        ~parliamentStatusView = View().background_(backgroundColor)
+            .layout_(HLayout().margins_(10).spacing_(15));
+        ~parliamentStatusView.fixedHeight = 60;
+        
+        // Consensus meter
+        ~consensusText = StaticText()
+            .string_("Consensus: 50%")
+            .stringColor_(mainTheme.green)
+            .font_(Font("Monaco", 12, true))
+            .align_(\center)
+            .minWidth_(120);
+        
+        // Vote counter
+        ~voteCountText = StaticText()
+            .string_("Votes: 0/26")
+            .stringColor_(mainTheme.yellow)
+            .font_(Font("Monaco", 12, true))
+            .align_(\center)
+            .minWidth_(100);
+        
+        // Agent status indicators
+        ~agentStatusText = StaticText()
+            .string_("Agents: Species(5) eDNA(8) Fungi(4) AI(1)")
+            .stringColor_(mainTheme.cyan)
+            .font_(Font("Monaco", 10))
+            .align_(\center)
+            .minWidth_(300);
+        
+        ~parliamentStatusView.layout.add(~consensusText);
+        ~parliamentStatusView.layout.add(~voteCountText);
+        ~parliamentStatusView.layout.add(~agentStatusText);
+        
+        // Parliament control buttons
+        ~parliamentControlView = View().background_(backgroundColor)
+            .layout_(HLayout().margins_(10).spacing_(10));
+        ~parliamentControlView.fixedHeight = 50;
+        
+        // Start parliament button
+        ~startParliamentButton = Button()
+            .states_([
+                ["START PARLIAMENT", mainTheme.foreground, backgroundColor.blend(mainTheme.purple, 0.2)],
+                ["STOP PARLIAMENT", backgroundColor, mainTheme.purple]
+            ])
+            .font_(Font("Helvetica", 10, true))
+            .action_({ |btn|
+                if(btn.value == 1) {
+                    if(~startParliamentSystem.notNil) {
+                        ~startParliamentSystem.();
+                        "Parliament system activated".postln;
+                    } { "Parliament system not loaded!".warn; btn.value = 0; };
+                } {
+                    if(~stopParliamentSystem.notNil) {
+                        ~stopParliamentSystem.();
+                        "Parliament system deactivated".postln;
+                    };
+                };
+            });
+        
+        // Simulate vote button
+        ~voteButton = Button()
+            .states_([["SIMULATE VOTE", mainTheme.foreground, backgroundColor.blend(mainTheme.green, 0.2)]])
+            .font_(Font("Helvetica", 10))
+            .action_({
+                if(~simulateVote.notNil) {
+                    ~simulateVote.("biodiversity protection");
+                } { "Parliament system not loaded!".warn; };
+            });
+        
+        // Emergency response button
+        ~emergencyButton = Button()
+            .states_([["EMERGENCY", mainTheme.foreground, backgroundColor.blend(mainTheme.red, 0.2)]])
+            .font_(Font("Helvetica", 10))
+            .action_({
+                if(~emergencyResponse.notNil) {
+                    ~emergencyResponse.(0.8);
+                } { "Parliament system not loaded!".warn; };
+            });
+        
+        // Test parliament button
+        ~testParliamentButton = Button()
+            .states_([["TEST PARL", mainTheme.foreground, backgroundColor.blend(mainTheme.cyan, 0.2)]])
+            .font_(Font("Helvetica", 10))
+            .action_({
+                if(~testParliament.notNil) {
+                    ~testParliament.();
+                } { "Parliament system not loaded!".warn; };
+            });
+        
+        ~parliamentControlView.layout.add(~startParliamentButton);
+        ~parliamentControlView.layout.add(~voteButton);
+        ~parliamentControlView.layout.add(~emergencyButton);
+        ~parliamentControlView.layout.add(~testParliamentButton);
+        
+        container.layout.add(~parliamentStatusView);
+        container.layout.add(~parliamentControlView);
+        
+        // Add all views to main window (all 4 control rows + samples + recording + parliament)
         ~mainWindow.layout.add(~header);
         ~mainWindow.layout.add(statusView);
         ~mainWindow.layout.add(counterView);
@@ -572,6 +682,7 @@
         ~mainWindow.layout.add(controlViewRow4);
         ~mainWindow.layout.add(sampleView);
         ~mainWindow.layout.add(recordingView);
+        ~mainWindow.layout.add(container); // Parliament panel
 
         // Add footer
         ~footer = StaticText()
@@ -596,6 +707,25 @@
                         ~counters.trans.string = (~globalState.transactionCount ? 0).asString;
                     };
 
+                    // Update Parliament status indicators
+                    if(~parliament.notNil and: {~parliament.state.notNil}) {
+                        var consensus, votes, activeAgents;
+                        consensus = (~parliament.state.currentConsensus * 100).round(1);
+                        votes = if(~parliament.controlBuses.notNil and: {~parliament.controlBuses.totalVotes.notNil}) {
+                            ~parliament.controlBuses.totalVotes.getSynchronous
+                        } { 26 };
+                        activeAgents = if(~parliament.state.isActive) { "ACTIVE" } { "INACTIVE" };
+                        
+                        ~consensusText.string = "Consensus: " ++ consensus ++ "%";
+                        ~voteCountText.string = "Votes: " ++ votes ++ "/26";
+                        ~agentStatusText.string = "Parliament: " ++ activeAgents;
+                        
+                        // Color consensus based on level
+                        ~consensusText.stringColor = if(consensus > 60) { mainTheme.green } { 
+                            if(consensus > 40) { mainTheme.yellow } { mainTheme.red }
+                        };
+                    };
+
                     // Refresh status lights
                     ~statusLights.do(_.refresh);
                 }.defer;
@@ -616,6 +746,15 @@
             ~knobViews = nil;
             ~sampleButtons = nil;
             ~sampleKnobs = nil;
+            ~consensusText = nil;
+            ~voteCountText = nil;
+            ~agentStatusText = nil;
+            ~parliamentStatusView = nil;
+            ~parliamentControlView = nil;
+            ~startParliamentButton = nil;
+            ~voteButton = nil;
+            ~emergencyButton = nil;
+            ~testParliamentButton = nil;
         };
 
         ~mainWindow.front;
