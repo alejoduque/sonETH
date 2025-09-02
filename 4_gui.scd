@@ -7,7 +7,7 @@
 {
     var statusView, counterView, controlView, controlViewRow2, controlViewRow3, controlViewRow4;
     var sampleView, sampleControlView, sampleHeader, sampleButtonView, stopButton;
-    var container;
+    var container, recordingView;
     var mainTheme, accentColor, backgroundColor, textColor;
     
     "Creating enhanced GUI with oscilloscope styling...".postln;
@@ -29,8 +29,8 @@
         textColor = mainTheme.foreground;
         accentColor = mainTheme.accent;
 
-        // Create and store window with enhanced styling (larger for merged controls + samples)
-        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES", Rect(100, 100, 1100, 1020))
+        // Create and store window with enhanced styling (larger for merged controls + samples + recording)
+        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES", Rect(100, 100, 1100, 1120))
             .background_(backgroundColor);
 
         ~mainWindow.view.layout_(VLayout().margins_(15).spacing_(15));
@@ -503,7 +503,66 @@
         sampleView.layout.add(sampleControlView);
 
 
-        // Add all views to main window (all 4 control rows + samples)
+        // Create recording controls section
+        recordingView = View().background_(backgroundColor.blend(mainTheme.red, 0.05))
+            .layout_(HLayout().margins_(15).spacing_(15));
+        recordingView.fixedHeight = 80;
+        
+        // Recording status indicator
+        ~recordingStatus = StaticText()
+            .string_("REC: READY")
+            .stringColor_(mainTheme.green)
+            .font_(Font("Monaco", 12, true))
+            .align_(\center)
+            .minWidth_(120);
+        
+        // Record button
+        ~recordButton = Button()
+            .states_([
+                ["● START REC", mainTheme.foreground, backgroundColor.blend(mainTheme.red, 0.2)],
+                ["■ STOP REC", backgroundColor, mainTheme.red]
+            ])
+            .font_(Font("Helvetica", 11, true))
+            .action_({ |btn|
+                if(btn.value == 1) {
+                    if(~startRecording.notNil) {
+                        ~startRecording.();
+                        ~recordingStatus.string_("REC: RECORDING").stringColor_(mainTheme.red);
+                    } { "Recording system not loaded!".warn; btn.value = 0; };
+                } {
+                    if(~stopRecording.notNil) {
+                        ~stopRecording.();
+                        ~recordingStatus.string_("REC: READY").stringColor_(mainTheme.green);
+                    };
+                };
+            });
+        
+        // Quick record button (30 seconds)
+        ~quickRecButton = Button()
+            .states_([["QUICK 30s", mainTheme.foreground, backgroundColor.blend(mainTheme.yellow, 0.2)]])
+            .font_(Font("Helvetica", 10))
+            .action_({
+                if(~quickRecord.notNil) {
+                    ~quickRecord.();
+                    ~recordingStatus.string_("REC: 30s AUTO").stringColor_(mainTheme.yellow);
+                } { "Recording system not loaded!".warn; };
+            });
+        
+        // Spatial GUI button
+        ~spatialGuiButton = Button()
+            .states_([["SPATIAL GUI", mainTheme.foreground, backgroundColor.blend(mainTheme.cyan, 0.2)]])
+            .font_(Font("Helvetica", 10))
+            .action_({
+                var spatialPath = "/Users/a/Documents/p r o y e c t o s/D O C T O R A D O - TADEO 2024/Sonificando ETH/eth_sonification/SøNeth/12_spatial_gui.scd";
+                spatialPath.load;
+            });
+        
+        recordingView.layout.add(~recordingStatus);
+        recordingView.layout.add(~recordButton);
+        recordingView.layout.add(~quickRecButton);
+        recordingView.layout.add(~spatialGuiButton);
+        
+        // Add all views to main window (all 4 control rows + samples + recording)
         ~mainWindow.layout.add(~header);
         ~mainWindow.layout.add(statusView);
         ~mainWindow.layout.add(counterView);
@@ -512,6 +571,7 @@
         ~mainWindow.layout.add(controlViewRow3);
         ~mainWindow.layout.add(controlViewRow4);
         ~mainWindow.layout.add(sampleView);
+        ~mainWindow.layout.add(recordingView);
 
         // Add footer
         ~footer = StaticText()

@@ -106,10 +106,11 @@ s.waitForBoot({
         grainSizeBus=(-1), sampleAmpBus=(-1), sampleReverbBus=(-1),
         sampleDelayBus=(-1), delayTimeBus=(-1), delayFeedbackBus=(-1),
         lowPassBus=(-1), highPassBus=(-1), filterResBus=(-1),
-        samplePanBus=(-1), spatialXBus=(-1), spatialYBus=(-1);
+        samplePanBus=(-1), sampleSpatialXBus=(-1), sampleSpatialYBus=(-1),
+        roomSizeBus=(-1), distanceEffectBus=(-1);
         
         var sig, grains, wet, processed, stretchAmount;
-        var bufChans, monoSig, stereoSig, monoGrains, stereoGrains;
+        var bufChans, monoSig, stereoSig, monoGrains, stereoGrains, distance, distanceAmp, quadSig;
         
         // Read control buses with fallbacks
         var controlRate = Select.kr(sampleRateBus >= 0, [rate, In.kr(sampleRateBus, 1)]);
@@ -125,6 +126,12 @@ s.waitForBoot({
         var controlHPF = Select.kr(highPassBus >= 0, [hpf, In.kr(highPassBus, 1)]);
         var controlFilterRes = Select.kr(filterResBus >= 0, [filterRes, In.kr(filterResBus, 1)]);
         var controlPan = Select.kr(samplePanBus >= 0, [pan, In.kr(samplePanBus, 1)]);
+        
+        // Spatial positioning from spatial GUI
+        var sampleSpatialX = Select.kr(sampleSpatialXBus >= 0, [spatialX, In.kr(sampleSpatialXBus, 1)]);
+        var sampleSpatialY = Select.kr(sampleSpatialYBus >= 0, [spatialY, In.kr(sampleSpatialYBus, 1)]);
+        var roomSizeParam = Select.kr(roomSizeBus >= 0, [0.8, In.kr(roomSizeBus, 1)]);
+        var distanceParam = Select.kr(distanceEffectBus >= 0, [0.5, In.kr(distanceEffectBus, 1)]);
         
         // Calculate final playback rate with pitch shift
         var finalRate = controlRate * controlTimeStretch.reciprocal * (controlPitch / 12).midiratio;
@@ -199,19 +206,33 @@ s.waitForBoot({
         );
         sig = sig + (wet * controlDelay);
         
-        // Reverb processing  
+        // Reverb processing with spatial room size
         sig = FreeVerb2.ar(
             sig[0], sig[1],
             controlReverb,
-            0.8,  // Room size
+            roomSizeParam.clip(0.1, 0.99),  // Room size from spatial GUI
             0.3   // Damping
         );
         
-        // Final amplitude and spatial positioning
-        sig = sig * controlAmp.clip(0, 1);
+        // Calculate distance-based amplitude scaling
+        distance = (sampleSpatialX.squared + sampleSpatialY.squared).sqrt;
+        distanceAmp = 1 - (distance * distanceParam * 0.5);
         
-        // Output to main or spatial buses
-        Out.ar(0, sig);
+        // Final amplitude with distance effect
+        sig = sig * controlAmp.clip(0, 1) * distanceAmp.clip(0.1, 1);
+        
+        // Quadraphonic spatial positioning for samples
+        quadSig = PanAz.ar(
+            4,                    // 4 channels for quad
+            sig.sum,              // Mono sum for panning
+            sampleSpatialX.atan2(sampleSpatialY) / pi,  // Angle from X,Y coordinates
+            1,                    // Amplitude
+            2,                    // Speaker array radius
+            0.5                   // Orientation
+        );
+        
+        // Output to main buses
+        Out.ar(0, quadSig);
     }).add;
     
     s.sync;

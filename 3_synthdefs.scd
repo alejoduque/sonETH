@@ -54,9 +54,11 @@ s.waitForBoot({
         textureBus=(-1), atmosphereBus=(-1), memoryBus=(-1), harmonicBus=(-1), resonantBus=(-1),
         // Additional drone/noise control buses
         masterAmpBus=(-1), filterCutoffBus=(-1), noiseLevelBus=(-1), noiseFiltBus=(-1),
-        droneDepthBus=(-1), droneFadeBus=(-1), droneSpaceBus=(-1), droneMixBus=(-1);
+        droneDepthBus=(-1), droneFadeBus=(-1), droneSpaceBus=(-1), droneMixBus=(-1),
+        // Spatial positioning buses
+        spatialXBus=(-1), spatialYBus=(-1), roomSizeBus=(-1), distanceEffectBus=(-1);
 
-        var env, sig, mod, carrier, grains, wet, noise, drone;
+        var env, sig, mod, carrier, grains, wet, noise, drone, distance, distanceAmp, quadSig;
         // MIDI bus inputs - Lawrence English ambient style with bus parameter fallbacks
         var masterVol = Select.kr(masterVolBus >= 0, [0.3, In.kr(masterVolBus, 1)]);
         var pitchOffset = Select.kr(pitchBus >= 0, [0.0, In.kr(pitchBus, 1)]);
@@ -77,6 +79,12 @@ s.waitForBoot({
         var droneIntensity = Select.kr(droneDepthBus >= 0, [0.3, In.kr(droneDepthBus, 1)]);
         var droneEnvelope = Select.kr(droneFadeBus >= 0, [2.0, In.kr(droneFadeBus, 1)]);
         var droneMix = Select.kr(droneMixBus >= 0, [0.5, In.kr(droneMixBus, 1)]);
+        
+        // Spatial positioning parameters from spatial GUI
+        var spatialX = Select.kr(spatialXBus >= 0, [0.0, In.kr(spatialXBus, 1)]);
+        var spatialY = Select.kr(spatialYBus >= 0, [0.0, In.kr(spatialYBus, 1)]);
+        var roomSizeParam = Select.kr(roomSizeBus >= 0, [0.8, In.kr(roomSizeBus, 1)]);
+        var distanceParam = Select.kr(distanceEffectBus >= 0, [0.5, In.kr(distanceEffectBus, 1)]);
         
         var grainMorph = textureDensity; // Use texture depth for granular morphing
         
@@ -128,11 +136,11 @@ s.waitForBoot({
         );
         sig = sig + wet;
         
-        // Atmospheric reverb
+        // Atmospheric reverb with spatial room size
         sig = FreeVerb2.ar(
             sig[0], sig[1],
             atmosphereLevel,
-            0.9,  // Large room
+            roomSizeParam.clip(0.1, 0.99),  // Room size from spatial GUI
             0.3   // Damping for ambient feel
         );
         
@@ -150,13 +158,24 @@ s.waitForBoot({
         // Apply legacy filter on top of spectral filter
         sig = LPF.ar(sig, legacyFilter.linexp(0, 1, 300, 6000));
         
-        // Combined volume control - make more responsive and audible
-        sig = sig * (amp * (masterVol.clip(0.01, 1).squared) * (legacyAmp.clip(0.01, 1)));
+        // Calculate distance-based amplitude scaling
+        distance = (spatialX.squared + spatialY.squared).sqrt;
+        distanceAmp = 1 - (distance * distanceParam * 0.5);
         
-        // Spatial positioning for quad output
-        sig = Balance2.ar(sig[0], sig[1], spatialPos);
+        // Combined volume control with distance effect
+        sig = sig * (amp * (masterVol.clip(0.01, 1).squared) * (legacyAmp.clip(0.01, 1)) * distanceAmp.clip(0.1, 1));
         
-        Out.ar(0, sig);
+        // Quadraphonic spatial positioning
+        quadSig = PanAz.ar(
+            4,                    // 4 channels for quad
+            sig.sum,              // Mono sum for panning
+            spatialX.atan2(spatialY) / pi,  // Angle from X,Y coordinates
+            1,                    // Amplitude
+            2,                    // Speaker array radius
+            0.5                   // Orientation
+        );
+        
+        Out.ar(0, quadSig);
     }).add;
 
     // Create control buses for MIDI - ensure proper initialization order
@@ -168,6 +187,12 @@ s.waitForBoot({
         ~buses[param].set(val);
         "Bus created: % = % (index: %)".format(param, val, ~buses[param].index).postln;
     };
+    
+    // Add spatial control buses for ambient sounds
+    ~buses.spatialX = Bus.control(s, 1).set(0.0);
+    ~buses.spatialY = Bus.control(s, 1).set(0.0);
+    ~buses.roomSize = Bus.control(s, 1).set(0.8);
+    ~buses.distanceEffect = Bus.control(s, 1).set(0.5);
     
     // Print final bus setup for debugging
     "".postln;

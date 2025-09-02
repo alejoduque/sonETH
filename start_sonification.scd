@@ -25,7 +25,8 @@
         "7_trend_analysis.scd",     // Analysis
         "8_transaction_buffer.scd", // Transaction management
         "9_spatial_headphone_sim.scd", // 4-channel headphone simulation
-        "10_sample_system.scd"      // Sample playback system with paulstretch
+        "10_sample_system.scd",     // Sample playback system with paulstretch
+        "11_recording_system.scd"   // Multichannel recording system
     ].do { |file|
         var path = basePath +/+ file;
         ("Loading " ++ file ++ "...").postln;
@@ -73,6 +74,17 @@
     "   ~triggerSample.(index) - Play sample by index (0-6)".postln;
     "   ~stopSample.() - Stop current sample".postln;
     "   ~listSamples.() - List available samples".postln;
+    "".postln;
+    "=== Recording Setup ===".postln;
+    "Recording functions available:".postln;
+    "   ~startRecording.() - Start 4-channel recording".postln;
+    "   ~stopRecording.() - Stop recording".postln;
+    "   ~quickRecord.() - Record 30 seconds".postln;
+    "   ~getRecordingStatus.() - Check recording status".postln;
+    "".postln;
+    "=== Spatial Control Setup ===".postln;
+    "Spatial GUI: Use 'SPATIAL GUI' button in main interface".postln;
+    "Manual loading: (thisProcess.nowExecutingPath.dirname +/+ \"12_spatial_gui.scd\").load".postln;
     "".postln;
     "=== Spatial Audio Setup ===".postln;
     "For headphone development (simulates 4-channel monitors):".postln;
