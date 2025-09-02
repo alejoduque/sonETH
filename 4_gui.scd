@@ -228,7 +228,7 @@
             var container, knobContainer, spec, knob, displayStr, valueLabel, paramName;
             var labelColor, knobColor;
 
-            // Use cyan colors for Parliament controls
+            // Use cyan colors for Parliament controls with better visibility
             labelColor = if(isParliament) { Color.cyan } { textColor };
             knobColor = if(isParliament) { Color.cyan } { accentColor };
 
@@ -243,12 +243,11 @@
                 .maxHeight_(80)
                 .maxWidth_(80)
                 .mode_(\vert)
-                .color_([
-                    mainTheme.background,  // background
-                    knobColor,             // fill color
-                    labelColor,            // outline/indicator
-                    mainTheme.background   // inner - simple background color
-                ])
+                .color_(if(isParliament) {
+                    [mainTheme.background, Color.cyan, mainTheme.foreground, mainTheme.foreground.alpha_(0.2)]
+                } {
+                    [mainTheme.background, accentColor, mainTheme.foreground, mainTheme.foreground.alpha_(0.2)]
+                })
                 .value_(spec.unmap(defaultVal));
 
             displayStr = label.asString;
