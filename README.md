@@ -1,3 +1,11 @@
+```
+  ____         _   _ _____ _____ _   _ 
+ / ___|  ____ | \ | | ____|_   _| | | |
+ \___ \ / _//\|  \| |  _|   | | | |_| |
+  ___) | (//) | |\  | |___  | | |  _  |
+ |____/ \//__/|_| \_|_____| |_| |_| |_|
+```
+
 # SøNeth: Ethereum Blockchain Sonification System
 ## Sistema de Sonificación de la Blockchain de Ethereum
 
