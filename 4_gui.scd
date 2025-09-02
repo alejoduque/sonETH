@@ -161,7 +161,7 @@
         ~controlSpecs = ~controlSpecs ?? (
             // Lawrence English Ambient Controls (expanded for real-time performance)
             masterVolume: ControlSpec(0.01, 1, \lin),   // Allow near-silence but not complete mute
-            pitchShift: ControlSpec(-24, 24, \lin),     // ±2 octaves for dramatic pitch blending
+            pitchShift: ControlSpec(-56, 56, \lin),     // ±56 semitones for lower freq access
             timeDilation: ControlSpec(0.5, 6, \exp),    // More dramatic time stretching
             spectralShift: ControlSpec(80, 8000, \exp), // Full audible filter range
             spatialSpread: ControlSpec(-1, 1, \lin),
@@ -287,7 +287,7 @@
                     
                     // Scale Parliament values to synthesis ranges
                     synthBusValue = switch(paramName,
-                        \consensusLevel, mappedVal.linlin(0, 1, -6, 6),        // ±6 semitones
+                        \consensusLevel, mappedVal.linlin(0, 1, -28, 28),      // ±28 semitones
                         \acousticPresence, mappedVal.linlin(0, 1, 0.2, 1.0),   // Filter range
                         \ednaValidation, mappedVal.linlin(0, 1, 0, 0.6),       // Texture range
                         \fungiChemical, mappedVal.linlin(0, 1, -1, 1),         // Spatial range

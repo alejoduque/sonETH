@@ -155,7 +155,7 @@ s.waitForBoot({
         additiveSpatial = parliamentFungi.linlin(0, 1, -0.5, 0.5);      // Add ±0.5 to spatial spread (wider)
         additiveHarmonic = parliamentAi.linlin(0, 1, 1.0, 6.0);         // Add 1.0-6.0 to harmonic richness (more dramatic FM)
         additiveTemporal = ~parliament.controlBuses.rotationSpeed.getSynchronous.linlin(0.1, 2.0, -1.0, 1.0); // Add ±1.0 to time dilation (more dramatic)
-        additivePitch = parliamentConsensus.linlin(0, 1, -6, 6);     // Add ±6 semitones pitch shift based on consensus
+        additivePitch = parliamentConsensus.linlin(0, 1, -28, 28);   // Add ±28 semitones pitch shift based on consensus
         
         // Apply Parliament modulation directly to synthesis buses
         if(~buses.notNil) {
@@ -219,7 +219,7 @@ s.waitForBoot({
                     ~parliament.state.lastVoteTime = Main.elapsedTime;
                 };
                 
-                2.wait; // Update every 2 seconds
+                0.1.wait; // Smooth updates every 0.1 seconds
             };
         }).play(AppClock);
         

@@ -94,9 +94,30 @@ El sistema opera en ciclos de 120 segundos que simulan:
 - `/agents/ai/consciousness <float>` - Nivel de consciencia IA
 
 #### Control Buses
-Sistema de 7 buses de control para modulación parlamentaria:
-- consensusLevel, rotationSpeed, totalVotes
-- acousticPresence, ednaValidation, fungiChemical, aiConsciousness
+Sistema de buses de control unificado entre GUI, OSC y síntesis:
+
+| Parámetro GUI | Bus Creado | Parámetro SynthDef | Función en Campanas |
+|---------------|------------|-------------------|-------------------|
+| masterVolume | ~buses.masterVolume | masterVolumeBus | Volumen principal |
+| pitchShift | ~buses.pitchShift | pitchShiftBus | Transposición ±56 semitonos |
+| timeDilation | ~buses.timeDilation | timeDilationBus | Estiramiento temporal |
+| spectralShift | ~buses.spectralShift | spectralShiftBus | Frecuencia de filtro espectral |
+| spatialSpread | ~buses.spatialSpread | spatialSpreadBus | Posicionamiento espacial |
+| textureDepth | ~buses.textureDepth | textureDepthBus | Densidad granular |
+| atmosphereMix | ~buses.atmosphereMix | atmosphereMixBus | Nivel de reverberación |
+| memoryFeed | ~buses.memoryFeed | memoryFeedBus | Retroalimentación de delay |
+| harmonicRich | ~buses.harmonicRich | harmonicRichBus | Complejidad FM |
+| resonantBody | ~buses.resonantBody | resonantBodyBus | Resonancia de filtro |
+| filterCutoff | ~buses.filterCutoff | filterCutoffBus | Filtro paso-bajo final |
+| noiseLevel | ~buses.noiseLevel | noiseLevelBus | Capa de ruido |
+| droneDepth | ~buses.droneDepth | droneDepthBus | Intensidad de drone |
+
+#### Controles GUI Parlamentarios (Fila 3 - Color Cian)
+- **consensusLevel** → pitchShift: Transposición basada en consenso (±6 semitonos)
+- **acousticPresence** → filterCutoff: Brillo de filtro por presencia de especies (0.2-1.0)
+- **ednaValidation** → textureDepth: Textura granular por validación genética (0-0.6)
+- **fungiChemical** → spatialSpread: Posicionamiento espacial por comunicación fúngica (±1.0)
+- **aiConsciousness** → harmonicRich: Complejidad FM por consciencia IA (1-8)
 
 ### Interfaz Gráfica Parlamentaria
 

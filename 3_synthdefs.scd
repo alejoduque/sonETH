@@ -15,7 +15,7 @@ s.waitForBoot({
     ~globalParams = (
         // === Lawrence English Ambient Controls (Row 1) ===
         masterVolume: 0.3,    // CC 0  - ACTUAL master volume control
-        pitchShift: 0.0,      // CC 1  - Frequency shift in semitones (-24 to +24)
+        pitchShift: 0.0,      // CC 1  - Frequency shift in semitones (-56 to +56)
         timeDilation: 2.0,    // CC 2  - Stretch/compress time (decay multiplier)
         spectralShift: 1000,  // CC 3  - Filter frequency for spectral shaping
         spatialSpread: 0.0,   // CC 4  - Spatial positioning (-1 to 1)
@@ -50,8 +50,8 @@ s.waitForBoot({
         atk=0.01, dec=0.3, rel=0.5,
         tone=0.3, res=0.4, pan=0,
         // Bus indices for real-time MIDI control (merged parameter set)
-        masterVolBus=(-1), pitchBus=(-1), timeBus=(-1), spectralBus=(-1), spatialBus=(-1),
-        textureBus=(-1), atmosphereBus=(-1), memoryBus=(-1), harmonicBus=(-1), resonantBus=(-1),
+        masterVolumeBus=(-1), pitchShiftBus=(-1), timeDilationBus=(-1), spectralShiftBus=(-1), spatialSpreadBus=(-1),
+        textureDepthBus=(-1), atmosphereMixBus=(-1), memoryFeedBus=(-1), harmonicRichBus=(-1), resonantBodyBus=(-1),
         // Additional drone/noise control buses
         masterAmpBus=(-1), filterCutoffBus=(-1), noiseLevelBus=(-1), noiseFiltBus=(-1),
         droneDepthBus=(-1), droneFadeBus=(-1), droneSpaceBus=(-1), droneMixBus=(-1),
@@ -60,16 +60,16 @@ s.waitForBoot({
 
         var env, sig, mod, carrier, grains, wet, noise, drone, distance, distanceAmp, quadSig;
         // MIDI bus inputs - Lawrence English ambient style with bus parameter fallbacks
-        var masterVol = Select.kr(masterVolBus >= 0, [0.3, In.kr(masterVolBus, 1)]);
-        var pitchOffset = Select.kr(pitchBus >= 0, [0.0, In.kr(pitchBus, 1)]);
-        var timeStretch = Select.kr(timeBus >= 0, [2.0, In.kr(timeBus, 1)]);
-        var spectralFreq = Select.kr(spectralBus >= 0, [1000, In.kr(spectralBus, 1)]);
-        var spatialPos = Select.kr(spatialBus >= 0, [0.0, In.kr(spatialBus, 1)]);
-        var textureDensity = Select.kr(textureBus >= 0, [0.2, In.kr(textureBus, 1)]);
-        var atmosphereLevel = Select.kr(atmosphereBus >= 0, [0.4, In.kr(atmosphereBus, 1)]);
-        var memoryFeedback = Select.kr(memoryBus >= 0, [0.3, In.kr(memoryBus, 1)]);
-        var harmonicComplexity = Select.kr(harmonicBus >= 0, [1.0, In.kr(harmonicBus, 1)]);
-        var filterResonance = Select.kr(resonantBus >= 0, [0.4, In.kr(resonantBus, 1)]);
+        var masterVol = Select.kr(masterVolumeBus >= 0, [0.3, In.kr(masterVolumeBus, 1)]);
+        var pitchOffset = Select.kr(pitchShiftBus >= 0, [0.0, In.kr(pitchShiftBus, 1)]);
+        var timeStretch = Select.kr(timeDilationBus >= 0, [2.0, In.kr(timeDilationBus, 1)]);
+        var spectralFreq = Select.kr(spectralShiftBus >= 0, [1000, In.kr(spectralShiftBus, 1)]);
+        var spatialPos = Select.kr(spatialSpreadBus >= 0, [0.0, In.kr(spatialSpreadBus, 1)]);
+        var textureDensity = Select.kr(textureDepthBus >= 0, [0.2, In.kr(textureDepthBus, 1)]);
+        var atmosphereLevel = Select.kr(atmosphereMixBus >= 0, [0.4, In.kr(atmosphereMixBus, 1)]);
+        var memoryFeedback = Select.kr(memoryFeedBus >= 0, [0.3, In.kr(memoryFeedBus, 1)]);
+        var harmonicComplexity = Select.kr(harmonicRichBus >= 0, [1.0, In.kr(harmonicRichBus, 1)]);
+        var filterResonance = Select.kr(resonantBodyBus >= 0, [0.4, In.kr(resonantBodyBus, 1)]);
         
         // Additional drone/noise parameters
         var legacyAmp = Select.kr(masterAmpBus >= 0, [0.7, In.kr(masterAmpBus, 1)]);
@@ -88,8 +88,8 @@ s.waitForBoot({
         
         var grainMorph = textureDensity; // Use texture depth for granular morphing
         
-        // Apply pitch shift (more audible range for real-time control)
-        freq = freq * (pitchOffset.clip(-24, 24) / 12).midiratio; // ±2 octaves for more dramatic effect
+        // Apply pitch shift (extended range for lower frequencies)
+        freq = freq * (pitchOffset.clip(-56, 56) / 12).midiratio; // ±56 semitones for lower freq access
         
         // FM Synthesis - more dramatic harmonic complexity for real-time control
         mod = SinOsc.ar(freq * harmonicComplexity.linexp(0.1, 8, 0.5, 4.0)) * 

@@ -154,22 +154,46 @@
         ^(baseGap * (1 / rate)).clip(0.05, 5.0);
     },
 
-    // Play transaction sound
+    // Play transaction sound with envelope modulation
     playTransaction: { |self, txData|
         if(txData.notNil and: { txData.note.notNil }) {
             var note = txData.note;
             var velocity = txData.velocity;
             var duration = txData.duration;
             var amp = velocity.linlin(30, 100, 0.05, 0.3);
+            var timeSinceLastTx = txData.timeSinceLast ? 1.0;
+            
+            // Use transaction data as envelope modulators
+            var txVelocityEnv = velocity.linlin(30, 100, 0.2, 1.0);        // Velocity → amplitude envelope
+            var txTimingEnv = timeSinceLastTx.clip(0.1, 5.0).linlin(0.1, 5.0, 0.05, 0.8); // Gap → attack time
+            var txDurationEnv = duration.linlin(0.1, 1.0, 0.3, 2.0);     // Duration → decay time
+            
+            // Modulate synthesis buses with transaction envelope data
+            if(~buses.notNil) {
+                // Velocity modulates master volume temporarily
+                if(~buses.masterVolume.notNil) {
+                    ~buses.masterVolume.set((~controlValues.masterVolume ? 0.3) * txVelocityEnv);
+                };
+                
+                // Transaction timing modulates time dilation
+                if(~buses.timeDilation.notNil) {
+                    ~buses.timeDilation.set((~controlValues.timeDilation ? 2.0) * txDurationEnv);
+                };
+                
+                // Transaction gap modulates texture depth
+                if(~buses.textureDepth.notNil) {
+                    ~buses.textureDepth.set((~controlValues.textureDepth ? 0.2) + (txTimingEnv * 0.3));
+                };
+            };
             
             amp = amp * (~buses[\txVolume].getSynchronous ? 0.5);
             
             Synth(\elektronBell, [
                 \freq, note.midicps,
-                \amp, amp,
-                \atk, 0.01,
-                \dec, duration * (~buses[\bellDecay].getSynchronous ? 1.5),
-                \rel, duration * 0.8,
+                \amp, amp * txVelocityEnv,                    // Transaction velocity affects amplitude
+                \atk, txTimingEnv.clip(0.001, 0.5),         // Transaction timing affects attack
+                \dec, duration * txDurationEnv,             // Transaction duration affects decay
+                \rel, duration * 0.8 * txDurationEnv,       // Duration affects release too
                 \tone, (~buses[\bellTone].getSynchronous ? 0.3),
                 \res, (~buses[\bellRes].getSynchronous ? 0.4),
                 \pan, (~buses[\bellSpread].getSynchronous ? 0.0).rand2,
@@ -177,6 +201,21 @@
                 \delayTime, ~buses[\delayTime].getSynchronous ? 0.4,
                 \reverbMix, ~buses[\reverbMix].getSynchronous ? 0.3
             ]);
+            
+            // Reset synthesis buses to original values after 0.5 seconds
+            {
+                if(~buses.notNil) {
+                    if(~buses.masterVolume.notNil) {
+                        ~buses.masterVolume.set(~controlValues.masterVolume ? 0.3);
+                    };
+                    if(~buses.timeDilation.notNil) {
+                        ~buses.timeDilation.set(~controlValues.timeDilation ? 2.0);
+                    };
+                    if(~buses.textureDepth.notNil) {
+                        ~buses.textureDepth.set(~controlValues.textureDepth ? 0.2);
+                    };
+                };
+            }.defer(0.5);
             
             self.updateVisualization(txData);
         };

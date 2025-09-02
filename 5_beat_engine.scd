@@ -6,7 +6,7 @@
 // Initialize default values with expanded parameter set
 ~beatParams = (
     // Rhythm parameters
-    beatTempo: 1.0,
+    beatTempo: 0.0,  // Disable beat engine clicks
     
     // Drone parameters
     droneFade: 2.0,
