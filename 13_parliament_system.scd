@@ -93,6 +93,7 @@ s.waitForBoot({
         
         consensus = yesVotes / totalVotes;
         ~parliament.controlBuses.consensusLevel.set(consensus);
+        ~parliament.controlBuses.totalVotes.set(totalVotes); // Store in bus for global access
         ~parliament.state.currentConsensus = consensus;
         
         result = if(consensus > 0.6) { "PASSED" } { "FAILED" };
@@ -134,26 +135,29 @@ s.waitForBoot({
     // Additive parameter mapping to existing SøNeth base synthesis
     ~mapParliamentToSoneth = {
         var parliamentConsensus, parliamentVotes, parliamentAcoustic, parliamentEdna, parliamentFungi, parliamentAi;
-        var additiveDepth, additiveNoise, additiveFilter, additiveTexture, additiveSpatial, additiveHarmonic, additiveTemporal;
+        var additiveDepth, additiveNoise, additiveFilter, additiveTexture, additiveSpatial, additiveHarmonic, additiveTemporal, additivePitch;
         
         // Read current parliament state
         parliamentConsensus = ~parliament.state.currentConsensus;
-        parliamentVotes = totalVotes;
-        parliamentAcoustic = acousticPresence;
-        parliamentEdna = ednaValidation;
-        parliamentFungi = fungiChemical;
-        parliamentAi = aiConsciousness;
+        parliamentVotes = if(~parliament.controlBuses.totalVotes.notNil) {
+            ~parliament.controlBuses.totalVotes.getSynchronous
+        } { 26 };
+        parliamentAcoustic = acousticPresence ? 0.6;
+        parliamentEdna = ednaValidation ? 0.85;
+        parliamentFungi = fungiChemical ? 0.65;
+        parliamentAi = aiConsciousness ? 0.8;
         
-        // Calculate additive modulation values (scaled for subtlety)
-        additiveDepth = parliamentConsensus.linlin(0, 1, 0, 0.3);        // Add up to 0.3 to drone depth
-        additiveNoise = parliamentVotes.linlin(0, 26, 0, 0.15);          // Add up to 0.15 to noise level
-        additiveFilter = parliamentAcoustic.linlin(0, 1, 0, 0.25);      // Add up to 0.25 to filter cutoff
-        additiveTexture = parliamentEdna.linlin(0, 1, 0, 0.2);          // Add up to 0.2 to texture depth
-        additiveSpatial = parliamentFungi.linlin(0, 1, -0.3, 0.3);      // Add ±0.3 to spatial spread
-        additiveHarmonic = parliamentAi.linlin(0, 1, 0, 2.0);           // Add up to 2.0 to harmonic richness
-        additiveTemporal = ~parliament.controlBuses.rotationSpeed.getSynchronous.linlin(0.1, 2.0, -0.5, 0.5); // Add ±0.5 to time dilation
+        // Calculate additive modulation values (scaled for audibility)
+        additiveDepth = parliamentConsensus.linlin(0, 1, 0, 0.5);        // Add up to 0.5 to drone depth (more audible)
+        additiveNoise = parliamentVotes.linlin(0, 26, 0, 0.3);           // Add up to 0.3 to noise level (doubled)
+        additiveFilter = parliamentAcoustic.linlin(0, 1, 0, 0.4);       // Add up to 0.4 to filter cutoff (more dramatic)
+        additiveTexture = parliamentEdna.linlin(0, 1, 0, 0.4);          // Add up to 0.4 to texture depth (doubled)
+        additiveSpatial = parliamentFungi.linlin(0, 1, -0.5, 0.5);      // Add ±0.5 to spatial spread (wider)
+        additiveHarmonic = parliamentAi.linlin(0, 1, 1.0, 6.0);         // Add 1.0-6.0 to harmonic richness (more dramatic FM)
+        additiveTemporal = ~parliament.controlBuses.rotationSpeed.getSynchronous.linlin(0.1, 2.0, -1.0, 1.0); // Add ±1.0 to time dilation (more dramatic)
+        additivePitch = parliamentConsensus.linlin(0, 1, -6, 6);     // Add ±6 semitones pitch shift based on consensus
         
-        // Apply additive modulation to existing buses (if they exist)
+        // Apply Parliament modulation directly to synthesis buses
         if(~buses.notNil) {
             if(~buses.droneDepth.notNil) {
                 ~buses.droneDepth.set((~controlValues.droneDepth ? 0.3) + additiveDepth);
@@ -175,6 +179,9 @@ s.waitForBoot({
             };
             if(~buses.timeDilation.notNil) {
                 ~buses.timeDilation.set((~controlValues.timeDilation ? 2.0) + additiveTemporal);
+            };
+            if(~buses.pitchShift.notNil) {
+                ~buses.pitchShift.set((~controlValues.pitchShift ? 0.0) + additivePitch);
             };
         };
         
@@ -341,6 +348,6 @@ s.waitForBoot({
     "  ~testParliament.() - Test parliament integration".postln;
     "".postln;
     "Parliamentary agents: 5 species + 8 eDNA sites + 4 fungi networks + 1 AI core".postln;
-    "Democratic consensus affects: drone depth, noise level, filter cutoff, texture depth, spatial spread, harmonic richness, time dilation".postln;
+    "Democratic consensus affects: drone depth, noise level, filter cutoff, texture depth, spatial spread, harmonic richness, time dilation, pitch shift".postln;
 });
 )

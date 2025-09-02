@@ -29,8 +29,8 @@
         textColor = mainTheme.foreground;
         accentColor = mainTheme.accent;
 
-        // Create and store window with enhanced styling (larger for merged controls + samples + recording + parliament)
-        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES + PARLIAMENT", Rect(100, 100, 1100, 1300))
+        // Create and store window with enhanced styling (wider for parliament on right side)
+        ~mainWindow = Window("Ethereum Sonification Control - MERGED + SAMPLES + PARLIAMENT", Rect(100, 100, 1400, 1120))
             .background_(backgroundColor);
 
         ~mainWindow.view.layout_(VLayout().margins_(15).spacing_(15));
@@ -157,7 +157,7 @@
             counterView.layout.add(counter.parent);
         });
 
-        // Control specs for MERGED ambient + drone/noise controls - EXPANDED RANGES
+        // Control specs for MERGED ambient + parliament controls - EXPANDED RANGES
         ~controlSpecs = ~controlSpecs ?? (
             // Lawrence English Ambient Controls (expanded for real-time performance)
             masterVolume: ControlSpec(0.01, 1, \lin),   // Allow near-silence but not complete mute
@@ -171,12 +171,12 @@
             harmonicRich: ControlSpec(0.1, 8, \exp),    // Wider FM ratio range for performance
             resonantBody: ControlSpec(0.1, 0.8, \lin),  // More filter resonance range
             
-            // Existing Drone/Noise Controls
-            masterAmp: ControlSpec(0, 1, \lin),
-            filterCutoff: ControlSpec(0, 1, \lin),
-            noiseLevel: ControlSpec(0, 0.5, \lin),
-            noiseFilt: ControlSpec(0, 1, \lin),
-            droneDepth: ControlSpec(0, 1, \lin),
+            // Parliament Controls (replacing unused drone/noise controls)
+            consensusLevel: ControlSpec(0, 1, \lin),
+            acousticPresence: ControlSpec(0, 1, \lin), 
+            ednaValidation: ControlSpec(0, 1, \lin),
+            fungiChemical: ControlSpec(0, 1, \lin),
+            aiConsciousness: ControlSpec(0, 1, \lin),
             droneFade: ControlSpec(0.1, 5, \exp),
             droneSpace: ControlSpec(0, 1, \lin),
             droneMix: ControlSpec(0, 1, \lin),
@@ -184,7 +184,7 @@
             transactionInfluence: ControlSpec(0, 1, \lin)
         );
 
-        // Initialize control values for MERGED ambient + drone/noise controls
+        // Initialize control values for MERGED ambient + parliament controls
         ~controlValues = ~controlValues ?? (
             // Lawrence English Ambient Controls
             masterVolume: 0.3,
@@ -198,12 +198,12 @@
             harmonicRich: 1.0,
             resonantBody: 0.4,
             
-            // Existing Drone/Noise Controls
-            masterAmp: 0.7,
-            filterCutoff: 0.6,
-            noiseLevel: 0.1,
-            noiseFilt: 0.5,
-            droneDepth: 0.3,
+            // Parliament Controls (replacing unused drone/noise controls)
+            consensusLevel: 0.5,
+            acousticPresence: 0.6,
+            ednaValidation: 0.85,
+            fungiChemical: 0.65,
+            aiConsciousness: 0.8,
             droneFade: 2.0,
             droneSpace: 0.5,
             droneMix: 0.5,
@@ -211,21 +211,26 @@
             transactionInfluence: 0.3
         );
 
-        // Knob parameters layout - MERGED ambient + drone/noise controls
+        // Knob parameters layout - MERGED ambient + parliament controls
         ~knobParameters = [
             // Row 1: Core Performance Controls (Lawrence English Ambient)
             [\masterVolume, \pitchShift, \timeDilation, \spectralShift, \spatialSpread],
             // Row 2: Ambient Processing  
             [\textureDepth, \atmosphereMix, \memoryFeed, \harmonicRich, \resonantBody],
-            // Row 3: Drone/Noise Controls (Existing System)
-            [\masterAmp, \filterCutoff, \noiseLevel, \noiseFilt, \droneDepth],
-            // Row 4: Additional Drone Controls
+            // Row 3: Parliament Controls (Colombian Biodiversity Democracy)
+            [\consensusLevel, \acousticPresence, \ednaValidation, \fungiChemical, \aiConsciousness],
+            // Row 4: Additional Controls
             [\droneFade, \droneSpace, \droneMix, \delayFeedback, \transactionInfluence]
         ];
 
         // Enhanced knob function with oscilloscope aesthetics
-        ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin|
+        ~makeKnob = { |label, minVal, maxVal, defaultVal=0.5, mapping=\lin, isParliament=false|
             var container, knobContainer, spec, knob, displayStr, valueLabel, paramName;
+            var labelColor, knobColor;
+
+            // Use cyan colors for Parliament controls
+            labelColor = if(isParliament) { Color.cyan } { textColor };
+            knobColor = if(isParliament) { Color.cyan } { accentColor };
 
             container = View().background_(backgroundColor);
             container.layout_(VLayout().margins_(5).spacing_(5));
@@ -238,7 +243,12 @@
                 .maxHeight_(80)
                 .maxWidth_(80)
                 .mode_(\vert)
-                .color_([mainTheme.background, accentColor, mainTheme.foreground, mainTheme.foreground.alpha_(0.2)])
+                .color_([
+                    mainTheme.background,  // background
+                    knobColor,             // fill color
+                    labelColor,            // outline/indicator
+                    mainTheme.background   // inner - simple background color
+                ])
                 .value_(spec.unmap(defaultVal));
 
             displayStr = label.asString;
@@ -246,7 +256,7 @@
 
             valueLabel = StaticText()
                 .string_(displayStr ++ ": " ++ defaultVal.round(0.001))
-                .stringColor_(textColor)
+                .stringColor_(labelColor)
                 .font_(Font("Monaco", 10))  // 2px smaller
                 .align_(\center);
 
@@ -257,20 +267,62 @@
             // Define parameter name for both action and storage
             paramName = label.asSymbol;  // Use exact parameter name (already camelCase)
             
-            // Knob action with bus updates
+            // Knob action with bus updates (Parliament and regular)
             knob.action = { |k|
                 var mappedVal = spec.map(k.value);
-                "GUI Knob % moved: value=%, bus exists: %".format(
-                    paramName, mappedVal.round(0.001), 
-                    (~buses.notNil and: {~buses[paramName].notNil})
-                ).postln;
-                if(~buses.notNil and: {~buses[paramName].notNil}) {
-                    ~buses[paramName].set(mappedVal);
+                "GUI Knob % moved: value=%".format(paramName, mappedVal.round(0.001)).postln;
+                
+                // Handle Parliament controls - direct synthesis bus control
+                if(isParliament) {
+                    var synthBusName, synthBusValue;
+                    
+                    // Map Parliament parameters to synthesis buses
+                    synthBusName = switch(paramName,
+                        \consensusLevel, \pitchShift,      // Consensus controls pitch
+                        \acousticPresence, \filterCutoff,   // Species controls filter brightness  
+                        \ednaValidation, \textureDepth,     // eDNA controls granular texture
+                        \fungiChemical, \spatialSpread,     // Fungi controls spatial positioning
+                        \aiConsciousness, \harmonicRich,    // AI controls FM complexity
+                        paramName  // Fallback to same name
+                    );
+                    
+                    // Scale Parliament values to synthesis ranges
+                    synthBusValue = switch(paramName,
+                        \consensusLevel, mappedVal.linlin(0, 1, -6, 6),        // ±6 semitones
+                        \acousticPresence, mappedVal.linlin(0, 1, 0.2, 1.0),   // Filter range
+                        \ednaValidation, mappedVal.linlin(0, 1, 0, 0.6),       // Texture range
+                        \fungiChemical, mappedVal.linlin(0, 1, -1, 1),         // Spatial range
+                        \aiConsciousness, mappedVal.linlin(0, 1, 1, 8),        // FM range
+                        mappedVal  // Direct mapping for others
+                    );
+                    
+                    // Update synthesis bus and Parliament bus
+                    if(~buses.notNil and: {~buses[synthBusName].notNil}) {
+                        ~buses[synthBusName].set(synthBusValue);
+                        ~controlValues[synthBusName] = synthBusValue;
+                        "Parliament % controls % synthesis bus: %".format(
+                            paramName, synthBusName, synthBusValue.round(0.001)
+                        ).postln;
+                    };
+                    
+                    // Also update Parliament bus for state tracking
+                    if(~parliament.notNil and: {~parliament.controlBuses.notNil and: {~parliament.controlBuses[paramName].notNil}}) {
+                        ~parliament.controlBuses[paramName].set(mappedVal);
+                    };
+                    
                     ~controlValues[paramName] = mappedVal;
                     valueLabel.string = displayStr ++ ": " ++ mappedVal.round(0.001);
-                    "Bus % set to %".format(paramName, mappedVal.round(0.001)).postln;
+                    valueLabel.stringColor = labelColor; // Keep cyan color
                 } {
-                    "WARNING: Bus % not found!".format(paramName).warn;
+                    // Handle regular controls
+                    if(~buses.notNil and: {~buses[paramName].notNil}) {
+                        ~buses[paramName].set(mappedVal);
+                        ~controlValues[paramName] = mappedVal;
+                        valueLabel.string = displayStr ++ ": " ++ mappedVal.round(0.001);
+                        "Bus % set to %".format(paramName, mappedVal.round(0.001)).postln;
+                    } {
+                        "WARNING: Bus % not found!".format(paramName).warn;
+                    };
                 };
             };
 
@@ -310,14 +362,15 @@
             controlViewRow2.layout.add(~knobs[key]);
         };
 
-        // Third row knobs (drone/noise controls)
+        // Third row knobs (Parliament controls - cyan styling)
         ~knobParameters[2].do { |key|
             ~knobs[key] = ~makeKnob.value(
                 key.asString,
                 ~controlSpecs[key].minval,
                 ~controlSpecs[key].maxval,
                 ~controlValues[key],
-                ~controlSpecs[key].warp
+                ~controlSpecs[key].warp,
+                true  // isParliament flag for cyan styling
             );
             controlViewRow3.layout.add(~knobs[key]);
         };
@@ -672,17 +725,35 @@
         container.layout.add(~parliamentStatusView);
         container.layout.add(~parliamentControlView);
         
-        // Add all views to main window (all 4 control rows + samples + recording + parliament)
+        // Create main horizontal layout: controls on left, parliament on right
+        ~mainContentView = View().background_(backgroundColor)
+            .layout_(HLayout().margins_(10).spacing_(15));
+        
+        // Left side: existing controls
+        ~leftPanel = View().background_(backgroundColor)
+            .layout_(VLayout().margins_(0).spacing_(15));
+        ~leftPanel.fixedWidth = 1100;
+        
+        // Add existing controls to left panel
+        ~leftPanel.layout.add(statusView);
+        ~leftPanel.layout.add(counterView);
+        ~leftPanel.layout.add(controlView);
+        ~leftPanel.layout.add(controlViewRow2);
+        ~leftPanel.layout.add(controlViewRow3);
+        ~leftPanel.layout.add(controlViewRow4);
+        ~leftPanel.layout.add(sampleView);
+        ~leftPanel.layout.add(recordingView);
+        
+        // Right side: parliament panel
+        container.fixedWidth = 280;
+        
+        // Add to main horizontal layout
+        ~mainContentView.layout.add(~leftPanel);
+        ~mainContentView.layout.add(container); // Parliament panel
+        
+        // Add all to main window
         ~mainWindow.layout.add(~header);
-        ~mainWindow.layout.add(statusView);
-        ~mainWindow.layout.add(counterView);
-        ~mainWindow.layout.add(controlView);
-        ~mainWindow.layout.add(controlViewRow2);
-        ~mainWindow.layout.add(controlViewRow3);
-        ~mainWindow.layout.add(controlViewRow4);
-        ~mainWindow.layout.add(sampleView);
-        ~mainWindow.layout.add(recordingView);
-        ~mainWindow.layout.add(container); // Parliament panel
+        ~mainWindow.layout.add(~mainContentView);
 
         // Add footer
         ~footer = StaticText()
@@ -755,6 +826,8 @@
             ~voteButton = nil;
             ~emergencyButton = nil;
             ~testParliamentButton = nil;
+            ~mainContentView = nil;
+            ~leftPanel = nil;
         };
 
         ~mainWindow.front;
